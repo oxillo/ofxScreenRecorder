@@ -35,7 +35,7 @@
 #include <string.h>
 #include <math.h>
 
-#include "ofxLibav.h"
+#include "ofxScreenRecorder.h"
 
 /*#ifdef __cplusplus
 extern "C" {
@@ -687,4 +687,3 @@ bool AV::Stream::write(AV::Frame &frame)
     }*/
 }
 
-//Codec::codecregistered = false;

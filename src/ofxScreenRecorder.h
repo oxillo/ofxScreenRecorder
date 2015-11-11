@@ -1,3 +1,4 @@
+#pragma once
 #include "ofMain.h"
 
 
@@ -337,7 +338,20 @@ public :
         picture->width = width;
         picture->height = height;
 
+        /* the image can be allocated by any means and av_image_alloc() is
+         * just the most convenient way if av_malloc() is to be used */
+        int ret = av_image_alloc(picture->data, picture->linesize, width, height,pix_fmt, 32);
+        if (ret < 0) {
+            fprintf(stderr, "Could not allocate raw picture buffer\n");
+        }
+
         dataBufferIsInitialized = (av_frame_get_buffer(picture, 32) >= 0);
+    }
+
+    bool scale()
+    {
+       // sws_scale(sws_ctx, inData, inLinesize, 0, ctx->height, frame->data, frame->linesize);
+
     }
 
     ~Frame()
@@ -355,6 +369,7 @@ private :
     bool frameValidity;
     bool dataBufferIsInitialized;
     AVFrame *picture;
+    SwsContext * sws_ctx;
 
 friend class AV::Packet;
 friend class AV::Stream;
@@ -376,57 +391,64 @@ AVFrame *picture;
 
 }
 
-class AllCodecs
-{
-public:
-	AllCodecs()
-	{
-		avcodec_register_all();
-		registered = true;
-	}
-	
-	bool areRegistered()
-	{
-		return registered;
-	}
-	
-private :
-		bool registered;
-};
 
-class Codec
+class ofxScreenRecorder
 {
 	//static AllCodecs allcodecs;
 
 public:
-	Codec(int codec_id)
+    ofxScreenRecorder() : video_codec_id(-1), isCodecOpened(false), isOpened(false)
+    {
+        registerAllCodecs();
+    }
+
+
+    ofxScreenRecorder(int codec_id) : ofxScreenRecorder()
 	{
-		if (!isRegistered())
-		{
-			exit(-1);
-		}
-		codec = avcodec_find_encoder((enum AVCodecID)codec_id);
-		if (!codec) {
-			fprintf(stderr, "Codec not found\n");
-        exit(1);
-		}
-		ctx = avcodec_alloc_context3(codec);
-		if (!ctx) {
-			fprintf(stderr, "Could not allocate video codec context\n");
-			exit(2);
-		}
-		isOpened = false;
+        setupCodec(codec_id);
 	}
-	
-	bool setup()
+
+
+    void setupCodec(int codec_id)
+    {
+        // Release the currently allocated codec context and/or file
+        if (ctx) {
+            cleanup();
+        }
+
+        // Look for the speciifed codec
+        codec = avcodec_find_encoder((enum AVCodecID)codec_id);
+        if (!codec) {
+            ofLogWarning("ofxScreenRecorder") << "Codec not found";
+            video_codec_id = -1;
+            return;
+        }
+        video_codec_id = codec_id;
+
+        // Allocate a new codec context
+        ctx = avcodec_alloc_context3(codec);
+        if (!ctx) {
+            ofLogWarning("ofxScreenRecorder") << "Could not allocate video codec context";
+        }
+    }
+
+
+    void setup(int width, int height, int fps=30)
 	{
+        if (!ctx) {
+            ofLogError("ofxScreenRecorder") << "Cannot setup. The codec is unavailable or wasn't succesfully allocated";
+            return;
+        }
 		/* put sample parameters */
-		ctx->bit_rate = 400000;
+        //ctx->bit_rate = 4000000;
 		/* resolution must be a multiple of two */
-		ctx->width = 1440;
-		ctx->height = 900;
+        //TODO : Check if resolution are multiples of 2
+        ctx->width = width;
+        ctx->height = height;
+
 		/* frames per second */
-		ctx->time_base = (AVRational){1,25};
+        //TODO : Check if fps > 0
+        ctx->time_base = (AVRational){1,fps};
 		/* emit one intra frame every ten frames
 		 * check frame pict_type before passing frame
 		 * to encoder, if frame->pict_type is AV_PICTURE_TYPE_I
@@ -435,28 +457,33 @@ public:
 		 */
 		ctx->gop_size = 10;
 		ctx->max_b_frames = 1;
+
 		ctx->pix_fmt = AV_PIX_FMT_YUV420P;
 		//ctx->pix_fmt = AV_PIX_FMT_RGB ;
 		
-		//if (codec_id == AV_CODEC_ID_H264)
-		//av_opt_set(ctx->priv_data, "preset", "ultrafast", 0);
-		//av_opt_set(ctx->priv_data, "tune", "zerolatency", 0);
+        if (video_codec_id == AV_CODEC_ID_H264) {
+            av_opt_set(ctx->priv_data, "preset", "ultrafast", 0);
+            av_opt_set(ctx->priv_data, "tune", "zerolatency", 0);
+            av_opt_set(ctx->priv_data, "qp", "18", 0);
+        }
 		
 		/* open it */
 		if (avcodec_open2(ctx, codec, NULL) < 0) {
 			fprintf(stderr, "Could not open codec\n");
-			return false;
+            return;
 		}
+        isCodecOpened = true;
 		
 		
-		frame = av_frame_alloc();
+        //frame = Frame(ctx->pix_fmt,ctx->width,ctx->height);
+        frame = av_frame_alloc();
 		if (!frame) {
 			fprintf(stderr, "Could not allocate video frame\n");
-			return false;
+            return ;
 		}
 		frame->format = ctx->pix_fmt;
 		frame->width  = ctx->width;
-		frame->height = ctx->height;
+        frame->height = ctx->height;
 		
 		/* the image can be allocated by any means and av_image_alloc() is
 		 * just the most convenient way if av_malloc() is to be used */
@@ -464,7 +491,7 @@ public:
 							 ctx->pix_fmt, 32);
 		if (ret < 0) {
 			fprintf(stderr, "Could not allocate raw picture buffer\n");
-			return false;
+            return ;
 		}
 		sws_ctx = sws_getContext(ctx->width, ctx->height,
                                       AV_PIX_FMT_RGBA, ctx->width, ctx->height,
@@ -472,12 +499,23 @@ public:
 		
 		rgba32Data = new uint8_t[4*ctx->width*ctx->height];
 	
-		return true;
+        return ;
 	}
+
+    void setup(const ofFbo &fbo, int fps=30)
+    {
+        // Remember the FBO we are working with. We'll refer to it when writing frames
+        recordedFbo = std::make_shared<ofFbo>(fbo);
+
+
+        setup(fbo.getWidth(),fbo.getHeight(),fps);
+    }
 	
 	bool open(const char *filename)
 	{
-		f = fopen(filename, "wb");
+        close();
+
+        f = fopen(filename, "wb");
 		if (!f) {
 			fprintf(stderr, "Could not open %s\n", filename);
 			return false;
@@ -552,32 +590,73 @@ public:
         }
 		return true;
 	}
+
+
+
+    bool writeframe()
+    {
+        if (!isOpened || !recordedFbo) return false;
+
+        AVPacket pkt;
+        av_init_packet(&pkt);
+        pkt.data = NULL;    // packet data will be allocated by the encoder
+        pkt.size = 0;
+
+        int width = recordedFbo->getWidth();
+        int height = recordedFbo->getHeight();
+
+
+
+
+        ofPixels pixels;
+        recordedFbo->readToPixels(pixels);
+        uint8_t * inData[1] = { pixels.getData() }; // RGBA32 have one plane
+        //
+        // NOTE: In a more general setting, the rows of your input image may
+        //       be padded; that is, the bytes per row may not be 4 * width.
+        //       In such cases, inLineSize should be set to that padded width.
+        //
+        int inLinesize[1] = { 4*width }; // RGBA stride
+        sws_scale(sws_ctx, inData, inLinesize, 0, height, frame->data, frame->linesize);
+        frame->pts = frame->pts + 1;
+
+        int got_output;
+        /* encode the image */
+        int ret = avcodec_encode_video2(ctx, &pkt, frame, &got_output);
+        if (ret < 0) {
+            fprintf(stderr, "Error encoding frame\n");
+            exit(7);
+        }
+        if (got_output) {
+            //printf("Write frame %3d (size=%5d)\n", i, pkt.size);
+            fwrite(pkt.data, 1, pkt.size, f);
+            av_free_packet(&pkt);
+        }
+        return true;
+    }
 	
 	
-	/**
-	Close the file and the codec
-	*/
-	bool close()
+
+
+    void close()
+    {
+        if (f && isOpened) {
+            uint8_t endcode[] = { 0, 0, 1, 0xb7 };
+            fwrite(endcode, 1, sizeof(endcode), f);
+            fclose(f);
+            isOpened = false;
+        }
+    }
+	
+    ~ofxScreenRecorder()
 	{
-		if (isOpened) 
-		{
-			uint8_t endcode[] = { 0, 0, 1, 0xb7 };
-			fwrite(endcode, 1, sizeof(endcode), f);
-			fclose(f);
-			avcodec_close(ctx);
-			isOpened = false;
-		}
-	}
-	
-	~Codec()
-	{
-		close();
+        cleanup();
 		av_free(ctx);
 	}
 	
 private :
-	static bool isRegistered()
-     {
+    static bool registerAllCodecs()
+    {
        static bool registered = false;
 	   if (!registered) 
 	   {
@@ -585,13 +664,32 @@ private :
 		   registered = true;
 	   }
        return registered;
-     }
-	AVCodec *codec;
+    }
+
+    /**
+    Close the file and the codec
+    */
+    void cleanup()
+    {
+        if (isOpened)
+        {
+            close();
+            avcodec_close(ctx);
+        }
+    }
+
+
+
+
+    AVCodec *codec;
+    int video_codec_id;
 	AVCodecContext *ctx;
+    bool isCodecOpened;
 	SwsContext * sws_ctx;
-	AVFrame *frame;
+    AVFrame *frame;
 	bool isOpened;
 	FILE *f;
+    std::shared_ptr<ofFbo> recordedFbo;
 	uint8_t *rgba32Data;
 };
 
