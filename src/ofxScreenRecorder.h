@@ -418,6 +418,8 @@ public:
 
         // Look for the speciifed codec
         codec = avcodec_find_encoder((enum AVCodecID)codec_id);
+        codec = avcodec_find_encoder_by_name("libx264rgb");
+
         if (!codec) {
             ofLogWarning("ofxScreenRecorder") << "Codec not found";
             video_codec_id = -1;
@@ -458,11 +460,12 @@ public:
 		ctx->gop_size = 10;
 		ctx->max_b_frames = 1;
 
-		ctx->pix_fmt = AV_PIX_FMT_YUV420P;
-		//ctx->pix_fmt = AV_PIX_FMT_RGB ;
+        //ctx->pix_fmt = AV_PIX_FMT_YUV420P;
+        ctx->pix_fmt = AV_PIX_FMT_RGB24 ;
 		
         if (video_codec_id == AV_CODEC_ID_H264) {
-            av_opt_set(ctx->priv_data, "preset", "ultrafast", 0);
+            ofLogWarning() << "H264 codec";
+            av_opt_set(ctx->priv_data, "preset", "fast", 0);
             av_opt_set(ctx->priv_data, "tune", "zerolatency", 0);
             av_opt_set(ctx->priv_data, "qp", "18", 0);
         }
@@ -495,7 +498,7 @@ public:
 		}
 		sws_ctx = sws_getContext(ctx->width, ctx->height,
                                       AV_PIX_FMT_RGBA, ctx->width, ctx->height,
-                                      AV_PIX_FMT_YUV420P , 0, 0, 0, 0);
+                                      AV_PIX_FMT_RGB24 , 0, 0, 0, 0);
 		
 		rgba32Data = new uint8_t[4*ctx->width*ctx->height];
 	
