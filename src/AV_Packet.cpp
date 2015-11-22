@@ -10,6 +10,7 @@ Packet::Packet(AVCodecContext* ctx, Frame& frm) :
     av_init_packet(&pkt);
     pkt.data = NULL;    // packet data will be allocated by the encoder
     pkt.size = 0;
+
     int got_pkt;
     /* encode the image */
     if (avcodec_encode_video2(ctx, &pkt, frm.getAVFrame(), &got_pkt) < 0)
