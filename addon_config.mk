@@ -65,7 +65,7 @@ msys2:
 	#use pacman --needed -Sy mingw-w64-i686-zeromq for 32 bits installation
 	#use pacman --needed -Sy mingw-w64-x86_64-zeromq for 64 bits installation
 	#pkg-config --exists libzmq
-	ADDON_LDFLAGS = -lavcodec -lavdevice -lavfilter -lavformat -lavutil -lavresample -lswscale
+	ADDON_PKG_CONFIG_LIBRARIES = libavcodec libavutil libavformat libswresample libswscale
 	
 	#ADDON_PKG_CONFIG_LIBRARIES = 
 	

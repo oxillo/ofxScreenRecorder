@@ -1,245 +1,359 @@
-
-#include <string>
-
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <math.h>
-
 #include "ofxScreenRecorder.h"
-#include "AV_Packet.h"
 
-/*#ifdef __cplusplus
-extern "C" {
-#endif
+#define DEBUG ofLogNotice() << "Line " << __LINE__;
 
-#include "libavutil/channel_layout.h"
-#include "libavutil/mathematics.h"
-#include "libavutil/opt.h"
-#include "libavformat/avformat.h"
-#include "libavresample/avresample.h"
-#include "libswscale/swscale.h"
-
-#ifdef __cplusplus
-}
-#endif
-*/
-
-
-/* 5 seconds stream duration */
-#define STREAM_DURATION   5.0
-#define STREAM_FRAME_RATE 25 /* 25 images/s */
-#define STREAM_NB_FRAMES  ((int)(STREAM_DURATION * STREAM_FRAME_RATE))
-#define STREAM_PIX_FMT    AV_PIX_FMT_YUV420P /* default pix_fmt */
-//#define STREAM_PIX_FMT    AV_PIX_FMT_RGBA /* default pix_fmt */
-
-#define SCALE_FLAGS SWS_BICUBIC
+#define OFX_ADDON "ofxScreenRecorder"
 
 
 
-static bool registerAllCodecs()
+static AVFrame *alloc_picture(enum AVPixelFormat pix_fmt, int width, int height)
 {
-   static bool registered = false;
-   if (!registered)
-   {
-       avcodec_register_all();
-       registered = true;
-   }
-   return registered;
-}
+    AVFrame *picture;
+    int ret;
 
-ofxScreenRecorder::ofxScreenRecorder() : video_codec_id(-1), isCodecOpened(false), isOpened(false)
-{
-    registerAllCodecs();
-}
+    picture = av_frame_alloc();
+    if (!picture)
+        return NULL;
 
+    picture->format = pix_fmt;
+    picture->width  = width;
+    picture->height = height;
 
-ofxScreenRecorder::ofxScreenRecorder(int codec_id) : ofxScreenRecorder()
-{
-    setupCodec(codec_id);
-}
-
-
-ofxScreenRecorder::~ofxScreenRecorder()
-{
-    cleanup();
-    av_free(ctx);
-}
-
-
-void ofxScreenRecorder::setupCodec(int codec_id)
-{
-    // Release the currently allocated codec context and/or file
-    cleanup();
-
-    // Look for the speciifed codec
-    codec = avcodec_find_encoder((enum AVCodecID)codec_id);
-
-    if (!codec) {
-        ofLogWarning("ofxScreenRecorder") << "Codec not found";
-        return;
+    /* allocate the buffers for the frame data */
+    ret = av_frame_get_buffer(picture, 32);
+    if (ret < 0) {
+        fprintf(stderr, "Could not allocate frame data.\n");
+        exit(1);
     }
 
-    allocateCodecContext();
+    return picture;
 }
 
-void ofxScreenRecorder::setupCodec(string codec_name)
-{
-    // Release the currently allocated codec context and/or file
-    if (ctx) {
-        cleanup();
-    }
+const enum AVCodecID codec_id = AV_CODEC_ID_H264;
+const int titleHeight = 72;
+const int legendNbLines = 16;
+const ofColor recorderBackgroundColor = ofColor(0, 26, 92);
+const ofColor recorderForegroundColor = ofColor::white;
 
-    // Look for the speciifed codec
-    codec = avcodec_find_encoder_by_name(codec_name.c_str());
+//===============================================================================
+/* ScreenRecorder constructor */
+ScreenRecorder::ScreenRecorder(){
+    /* Initialize libavcodec, and register all codecs and formats. */
+    //av_register_all();
 
-    if (!codec) {
-        ofLogWarning("ofxScreenRecorder") << "Codec not found";
-        video_codec_id = -1;
-        return;
-    }
+    titleFont.load("arial.ttf",32);
+    //titleFont.setLineHeight(28.0f);
+    titleFont.setLetterSpacing(1.037);
+    //titleHeight = ( titleFont.getAscenderHeight() - titleFont.getDescenderHeight() ) * 1.5;
+    //titleAnchor = titleFont.getAscenderHeight() * 1.5;
+    legendFont.load("mono.ttf",18);
+    legendFont.setLineHeight(22.0f);
+    legendFont.setLetterSpacing(1.037);
+    //legendHeight = legendFont.getLineHeight();
+    //legendHeight = ( legendFont.getAscenderHeight() - legendFont.getDescenderHeight() ) * 1.2;
+    //legendAnchor = legendFont.getAscenderHeight() * 1.2;
+    setupCompleted = false;
+    isRecording = false;
+}
 
-    allocateCodecContext();
+//===============================================================================
+bool ScreenRecorder::setup( int width, int height ){
+
+    /* Stop movie recording if active */
+    stopRecordingMovie();
+
+    /* Keep track of the expected size of the rendered frame */
+    frameWidth = width;
+    frameHeight = height;
+
+    int legendHeight = int( legendNbLines * legendFont.getAscenderHeight() );
+
+    /* Allocate the frame buffer that will be used to hold the recorded frame content
+       It is the user content + the title at the top + the legend at the bottom 
+       For the recording to work, we need frames that have a width that are a multiple of 16*/
+    width = width + ( (16-width%16)%16 ); // Add the necessary pixels to have a 16 multiple
+    compositingFbo.allocate( width, titleHeight + height + legendHeight , GL_RGB);
+    compositingFboLeft = 0.5*( width - frameWidth );
+
+    setupCompleted = true;
+    return true;
+}
+
+//===============================================================================
+void ScreenRecorder::addLogo(ofImage newLogo){
+    float aspectRatio = newLogo.getWidth() / newLogo.getHeight();
+    logo = newLogo;
+    logo.resize( aspectRatio*titleHeight, titleHeight );
+
+    logoLeft = compositingFbo.getWidth() - aspectRatio*titleHeight;
 }
 
 
-void ofxScreenRecorder::setup(int width, int height, int fps)
-{
-    if (!ctx) {
-        ofLogError("ofxScreenRecorder") << "Cannot setup. The codec is unavailable or wasn't succesfully allocated";
-        return;
-    }
-    /* put sample parameters */
-    //ctx->bit_rate = 4000000;
-    /* resolution must be a multiple of two */
-    //TODO : Check if resolution are multiples of 2
-    ctx->width = width;
-    ctx->height = height;
-
-    /* frames per second */
-    //TODO : Check if fps > 0
-    ctx->time_base = (AVRational){1,fps};
-    /* emit one intra frame every ten frames
-     * check frame pict_type before passing frame
-     * to encoder, if frame->pict_type is AV_PICTURE_TYPE_I
-     * then gop_size is ignored and the output of encoder
-     * will always be I frame irrespective to gop_size
-     */
-    ctx->gop_size = 10;
-    ctx->max_b_frames = 1;
-
-    //ctx->pix_fmt = AV_PIX_FMT_YUV420P;
-    ctx->pix_fmt = AV_PIX_FMT_RGB24 ;
-
-    if (video_codec_id == AV_CODEC_ID_H264) {
-        ofLogWarning() << "H264 codec";
-        av_opt_set(ctx->priv_data, "preset", "fast", 0);
-        av_opt_set(ctx->priv_data, "tune", "zerolatency", 0);
-        av_opt_set(ctx->priv_data, "qp", "18", 0);
-    }
-
-    /* open it */
-    if (avcodec_open2(ctx, codec, NULL) < 0) {
-        fprintf(stderr, "Could not open codec\n");
-        return;
-    }
-    isCodecOpened = true;
-
-
-    avframe.setup(ctx);
-    return ;
-}
-
-void ofxScreenRecorder::setup(const ofFbo &fbo, int fps)
-{
-    // Remember the FBO we are working with. We'll refer to it when writing frames
-    recordedFbo = std::make_shared<ofFbo>(fbo);
-
-
-    setup(fbo.getWidth(),fbo.getHeight(),fps);
-}
-
-bool ofxScreenRecorder::open(const char *filename)
-{
-    close();
-
-    f = fopen(filename, "wb");
-    if (!f) {
-        fprintf(stderr, "Could not open %s\n", filename);
+//===============================================================================
+/* Add a video output stream. */
+bool ScreenRecorder::add_video_stream(){
+    
+    st = avformat_new_stream(oc, NULL);
+    if (!st) {
+        ofLogError(OFX_ADDON) << "add_video_stream : could not allocate stream";
         return false;
     }
-    isOpened = true;
+
+    st->time_base = enc->time_base;
+    
     return true;
 }
 
+//===============================================================================
+bool ScreenRecorder::setup_encoder( int width, int height, int fps){
+    AVCodec *codec;
+    
+    
+    /* find the video encoder */
+    codec = avcodec_find_encoder( codec_id );
+    if( !codec ){
+        ofLogError(OFX_ADDON) << "setup_encoder : codec not found";
+        return false;
+    }
 
-bool ofxScreenRecorder::writeframe()
-{
-    if (!isOpened || !recordedFbo) return false;
+    enc = avcodec_alloc_context3( codec );
+    if( !enc ){
+        ofLogError(OFX_ADDON) << "setup_encoder : could not alloc an encoding context";
+        return false;
+    }
+    
+    /* Put sample parameters. */
+    enc->bit_rate = 4000000;
+    /* Resolution must be a multiple of two. */
+    enc->width    = width;
+    enc->height   = height;
+    /* timebase: This is the fundamental unit of time (in seconds) in terms
+     * of which frame timestamps are represented. For fixed-fps content,
+     * timebase should be 1/framerate and timestamp increments should be
+     * identical to 1. */
+    //enc->time_base       = (AVRational){ 1, fps };
+    enc->time_base = (AVRational){ 1, 1000000}; // microseconds
 
-    /*AVPacket pkt;
-    av_init_packet(&pkt);
-    pkt.data = NULL;    // packet data will be allocated by the encoder
-    pkt.size = 0;*/
+    enc->gop_size      = 12; /* emit one intra frame every twelve frames at most */
+    enc->pix_fmt       = AV_PIX_FMT_YUV444P;
+    //enc->pix_fmt       = AV_PIX_FMT_RGB24;
+
+    enc->max_b_frames = 1;
+    
+    if( enc->codec_id == AV_CODEC_ID_MPEG2VIDEO ){
+        /* just for testing, we also add B-frames */
+        enc->max_b_frames = 2;
+    }
+    if( enc->codec_id == AV_CODEC_ID_MPEG1VIDEO ){
+        /* Needed to avoid using macroblocks in which some coeffs overflow.
+         * This does not happen with normal video, it just happens here as
+         * the motion of the chroma plane does not match the luma plane. */
+        enc->mb_decision = 2;
+    }
+    if( codec_id == AV_CODEC_ID_H264 ){
+        av_opt_set(enc->priv_data, "preset", "fast", 0);
+    }
+    if( codec_id == AV_CODEC_ID_H265 ){
+        av_opt_set(enc->priv_data, "preset", "fast", 0);
+    }
+
+    return true;
+}
+
+//===============================================================================
+void ScreenRecorder::open_video(std::string filename){
+    int ret;
+
+    /* Setup the encoder */
+    int fps = 30;
+    if( !setup_encoder( compositingFbo.getWidth(), compositingFbo.getHeight(), fps) ){
+        ofLogError(OFX_ADDON) << "setup : could not setup encoder";
+        return;
+    }
+
+    /* Allocate the output context for the muxer */
+    oc = avformat_alloc_context();
+    if (!oc) {
+        ofLogError(OFX_ADDON) << "Could not allocate output context";
+        return;
+    }
+
+    /* Determine the output format of the muxer from the extension of the file name : using dummy.mp4 */
+    oc->oformat = av_guess_format(NULL, "dummy.mp4", NULL);
+    if (!oc->oformat) {
+        ofLogError(OFX_ADDON) << "Could not find suitable output format";
+        return;
+    }
+    /* Determine if the container is a file or a stream */
+    isFileFormat = !(oc->oformat->flags & AVFMT_NOFILE);
+
+       /* Some formats want stream headers to be separate. */
+    if (oc->oformat->flags & AVFMT_GLOBALHEADER)
+        enc->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+
+    add_video_stream();
 
 
-    ofPixels pixels;
-    recordedFbo->readToPixels(pixels);
+    /* open the codec */
+    if (avcodec_open2(enc, NULL, NULL) < 0) {
+        ofLogError() << "could not open codec";
+    }
 
-    avframe << pixels;
-    // Can also be written as
-    //   avframe.scale(pixels);
+    /* Allocate the encoded raw picture. */
+    frame = alloc_picture(enc->pix_fmt, enc->width, enc->height);
+    if (!frame) {
+        ofLogError() << "Could not allocate picture";
+    }
 
-    AV::Packet pack(ctx,avframe);
-    pack.write(f);
-
-
-
-    /*int got_output;
-    int ret = avcodec_encode_video2(ctx, &pkt, avframe.getAVFrame(), &got_output);
+    /* copy the stream parameters to the muxer */
+    ret = avcodec_parameters_from_context(st->codecpar, enc);
     if (ret < 0) {
-        fprintf(stderr, "Error encoding frame\n");
-        exit(7);
+        ofLogError() << "Could not copy the stream parameters";
     }
-    if (got_output) {
-        //printf("Write frame %3d (size=%5d)\n", i, pkt.size);
-        fwrite(pkt.data, 1, pkt.size, f);
-        av_free_packet(&pkt);
-    }*/
-    return true;
+
+    av_dump_format(oc, 0, filename.c_str(), 1);
+
+    if (isFileFormat) {
+        if (avio_open(&oc->pb, filename.c_str(), AVIO_FLAG_WRITE) < 0) {
+            ofLogError() << "Could not open '" << filename <<"'";
+        }
+    }
+
+    /* Write the stream header, if any. */
+    avformat_write_header(oc, NULL);
+    isRecording = true;
+}
+
+//===============================================================================
+void ScreenRecorder::snapshot(std::string filename){
+    static int snapshotNumber = 0;
+    /* Build an automatic file name if needed */
+    if( filename=="" ){
+        std::stringstream autoFilename;
+        autoFilename << "snapshot_" << setfill('0') << setw(4) << snapshotNumber << ".png";
+        snapshotNumber++;
+        filename = autoFilename.str();
+    }
+    ofSaveImage( pix, filename );
+}
+
+//===============================================================================
+void ScreenRecorder::startRecordingMovie( std::string filename ){
+    static int movieNumber = 0;
+    /* Stop active recording if any */
+    if( isRecording ) stopRecordingMovie();
+
+    /* Build an automatic file name if needed */
+    if( filename=="" ){
+        std::stringstream autoFilename;
+        autoFilename << "movie_" << setfill('0') << setw(4) << movieNumber << ".mp4";
+        movieNumber++;
+        filename = autoFilename.str();
+    }
+    open_video(filename);
+    movieStartTimeMicros = ofGetSystemTimeMicros();
+}
+
+//===============================================================================
+void ScreenRecorder::stopRecordingMovie(){
+    /* Write the trailer and close the file if needed */
+    if( isRecording ){
+        av_write_trailer(oc);
+    
+        if( isFileFormat ){
+            avio_close(oc->pb);
+        }
+        avcodec_free_context(&enc);
+        av_frame_free(&frame);
+        avformat_free_context(oc);
+    }
+    isRecording = false;
+}
+
+//===============================================================================
+void ScreenRecorder::update_video_frame(){
+    
+    static struct SwsContext *sws_context = NULL;
+    static int64_t next_pts = 0;
+    
+    uint8_t *rgb;
+    const int in_linesize[1] = { 3 * frame->width };
+    
+    rgb = pix.getData();
+    sws_context = sws_getCachedContext(sws_context,
+            frame->width, frame->height, AV_PIX_FMT_RGB24,
+            frame->width, frame->height, enc->pix_fmt,
+            0, NULL, NULL, NULL);
+    sws_scale(sws_context, (const uint8_t * const *) &rgb, in_linesize, 0,
+            frame->height, frame->data, frame->linesize);
+    
+    //frame->pts = next_pts++;
+    frame->pts = ofGetSystemTimeMicros() - movieStartTimeMicros;
+
+    return;
+}
+
+/*
+ * encode one video frame and send it to the muxer
+ * return 1 when encoding is finished, 0 otherwise
+ */
+void ScreenRecorder::draw( const ofFbo &fbo ){
+    int ret;
+
+    compositingFbo.begin();
+        ofClear(recorderBackgroundColor);
+        ofSetColor(recorderForegroundColor);
+        titleFont.drawString(recorderTitle, 20,titleFont.getAscenderHeight()*1.2);
+        legendFont.drawString(recorderLegend,20,titleHeight+frameHeight+legendFont.getAscenderHeight()*1.2 );
+        ofSetColor(ofColor::white);
+        if( logo.isAllocated() )
+            logo.draw( logoLeft, 0, logo.getWidth(), logo.getHeight() );
+        fbo.draw( compositingFboLeft, titleHeight, frameWidth, frameHeight );
+    compositingFbo.end();
+    compositingFbo.readToPixels( pix );
+    
+    if( isRecording ){
+        update_video_frame();
+        if (frame == NULL) ofLogError() << "NULL Frame";
+        /* encode the image */
+        ret = avcodec_send_frame(enc, frame);
+        if (ret < 0) {
+            fprintf(stderr, "Error submitting a frame for encoding\n");
+        }
+        while (ret >= 0) {
+            AVPacket pkt = { 0 };
+
+            av_init_packet(&pkt);
+
+            ret = avcodec_receive_packet(enc, &pkt);
+            if (ret < 0 && ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
+                fprintf(stderr, "Error encoding a video frame\n");
+            } else if (ret >= 0) {
+                av_packet_rescale_ts(&pkt, enc->time_base, st->time_base);
+                pkt.stream_index = st->index;
+
+                /* Write the compressed frame to the media file. */
+                ret = av_interleaved_write_frame(oc, &pkt);
+                if (ret < 0) {
+                    fprintf(stderr, "Error while writing video frame\n");
+                }
+            }
+        }
+    }
+}
+
+ScreenRecorder::~ScreenRecorder() {
+    stopRecordingMovie();
 }
 
 
 
 
-void ofxScreenRecorder::close()
-{
-    if (f && isOpened) {
-        uint8_t endcode[] = { 0, 0, 1, 0xb7 };
-        fwrite(endcode, 1, sizeof(endcode), f);
-        fclose(f);
-        isOpened = false;
-    }
-}
 
 
 
-void ofxScreenRecorder::allocateCodecContext()
-{
-    video_codec_id = codec->id;
-    // Allocate a new codec context
-    ctx = avcodec_alloc_context3(codec);
-    if (!ctx) {
-        ofLogWarning("ofxScreenRecorder") << "Could not allocate video codec context";
-    }
-}
 
-void ofxScreenRecorder::cleanup()
-{
-    if(ctx && isOpened)
-    {
-        close();
-        avcodec_close(ctx);
-        video_codec_id = AV_CODEC_ID_NONE;
-    }
-}
+
+
+
+
