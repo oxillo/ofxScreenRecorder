@@ -83,60 +83,6 @@ bool ScreenRecorder::add_video_stream(){
 }
 
 //===============================================================================
-bool ScreenRecorder::setup_encoder( int width, int height, int fps){
-    AVCodec *codec;
-    
-    
-    /* find the video encoder */
-    codec = avcodec_find_encoder( codec_id );
-    if( !codec ){
-        ofLogError(OFX_ADDON) << "setup_encoder : codec not found";
-        return false;
-    }
-
-    enc = avcodec_alloc_context3( codec );
-    if( !enc ){
-        ofLogError(OFX_ADDON) << "setup_encoder : could not alloc an encoding context";
-        return false;
-    }
-    
-    /* Put sample parameters. */
-    enc->bit_rate = 4000000;
-    /* Resolution must be a multiple of two. */
-    enc->width    = width;
-    enc->height   = height;
-    /* timebase: This is the fundamental unit of time (in seconds) in terms
-     * of which frame timestamps are represented. For fixed-fps content,
-     * timebase should be 1/framerate and timestamp increments should be
-     * identical to 1. */
-    //enc->time_base       = (AVRational){ 1, fps };
-    enc->time_base = (AVRational){ 1, 1000000}; // microseconds
-
-    enc->gop_size      = 12; /* emit one intra frame every twelve frames at most */
-    enc->pix_fmt       = AV_PIX_FMT_YUV444P;
-    //enc->pix_fmt       = AV_PIX_FMT_RGB24;
-
-    enc->max_b_frames = 1;
-    
-    if( enc->codec_id == AV_CODEC_ID_MPEG2VIDEO ){
-        /* just for testing, we also add B-frames */
-        enc->max_b_frames = 2;
-    }
-    if( enc->codec_id == AV_CODEC_ID_MPEG1VIDEO ){
-        /* Needed to avoid using macroblocks in which some coeffs overflow.
-         * This does not happen with normal video, it just happens here as
-         * the motion of the chroma plane does not match the luma plane. */
-        enc->mb_decision = 2;
-    }
-    if( codec_id == AV_CODEC_ID_H264 ){
-        av_opt_set(enc->priv_data, "preset", "fast", 0);
-    }
-    if( codec_id == AV_CODEC_ID_H265 ){
-        av_opt_set(enc->priv_data, "preset", "fast", 0);
-    }
-
-    return true;
-}
 
 //===============================================================================
 void ScreenRecorder::open_video(std::string filename){
@@ -144,10 +90,7 @@ void ScreenRecorder::open_video(std::string filename){
 
     /* Setup the encoder */
     int fps = 30;
-    if( !setup_encoder( compositingFbo.getWidth(), compositingFbo.getHeight(), fps) ){
-        ofLogError(OFX_ADDON) << "setup : could not setup encoder";
-        return;
-    }
+    enc = avpp::Encoder();
 
     /* Allocate the output context for the muxer */
     oc = avformat_alloc_context();
@@ -173,15 +116,13 @@ void ScreenRecorder::open_video(std::string filename){
 
 
     /* open the codec */
-    if (avcodec_open2(enc, NULL, NULL) < 0) {
-        ofLogError() << "could not open codec";
-    }
+    enc.setup( compositingFbo.getWidth(), compositingFbo.getHeight(), fps);
 
     /* Allocate the encoded raw picture. */
     frame = avpp::Frame(enc->pix_fmt, enc->width, enc->height);
     
     /* copy the stream parameters to the muxer */
-    ret = avcodec_parameters_from_context(st->codecpar, enc);
+    ret = avcodec_parameters_from_context(st->codecpar, enc.native());
     if (ret < 0) {
         ofLogError() << "Could not copy the stream parameters";
     }
@@ -238,7 +179,7 @@ void ScreenRecorder::stopRecordingMovie(){
         if( isFileFormat ){
             avio_close(oc->pb);
         }
-        avcodec_free_context(&enc);
+        //avcodec_free_context(&enc);
         //av_frame_free(&frame.frame);
         avformat_free_context(oc);
     }
@@ -291,7 +232,7 @@ void ScreenRecorder::draw( const ofFbo &fbo ){
         update_video_frame();
         if (frame.native() == NULL) ofLogError() << "NULL Frame";
         /* encode the image */
-        ret = avcodec_send_frame(enc, frame.native());
+        ret = avcodec_send_frame(enc.native(), frame.native());
         if (ret < 0) {
             fprintf(stderr, "Error submitting a frame for encoding\n");
         }
@@ -300,7 +241,7 @@ void ScreenRecorder::draw( const ofFbo &fbo ){
 
             av_init_packet(&pkt);
 
-            ret = avcodec_receive_packet(enc, &pkt);
+            ret = avcodec_receive_packet(enc.native(), &pkt);
             if (ret < 0 && ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
                 fprintf(stderr, "Error encoding a video frame\n");
             } else if (ret >= 0) {

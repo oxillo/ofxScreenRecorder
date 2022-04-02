@@ -1,7 +1,7 @@
 #pragma once
 #include "ofMain.h"
 #include <stdio.h>
-#include "avpp.h"
+#include "avpp/avpp.h"
 
 
 
@@ -127,7 +127,8 @@ private :
 
 
     AVFormatContext *oc;
-    AVCodecContext *enc;
+    //AVCodecContext *enc;
+    avpp::Encoder enc;
     AVStream *st;
     //AVFrame *frame;
     avpp::Frame frame;
