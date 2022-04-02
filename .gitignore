@@ -46,4 +46,5 @@ Temporary Items
 example*/bin/*.exe
 example*/bin/*.dll
 example*/bin/*.mp4
+example*/bin/data/*.log
 example*/obj/
