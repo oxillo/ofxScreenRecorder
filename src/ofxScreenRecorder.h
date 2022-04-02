@@ -1,27 +1,10 @@
 #pragma once
 #include "ofMain.h"
 #include <stdio.h>
+#include "avpp.h"
 
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
-#include "libavcodec/avcodec.h"
-
-#include "libavutil/frame.h"
-#include "libavutil/imgutils.h"
-
-#include "libavutil/channel_layout.h"
-#include "libavutil/mathematics.h"
-#include "libavutil/opt.h"
-#include "libavformat/avformat.h"
-#include "libswscale/swscale.h"
-
-#ifdef __cplusplus
-}
-#endif
 
 class ScreenRecorder {
 public:
@@ -146,7 +129,8 @@ private :
     AVFormatContext *oc;
     AVCodecContext *enc;
     AVStream *st;
-    AVFrame *frame;
+    //AVFrame *frame;
+    avpp::Frame frame;
     uint64_t movieStartTimeMicros;
     
 	std::string recorderTitle;

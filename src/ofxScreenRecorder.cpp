@@ -6,28 +6,6 @@
 
 
 
-static AVFrame *alloc_picture(enum AVPixelFormat pix_fmt, int width, int height)
-{
-    AVFrame *picture;
-    int ret;
-
-    picture = av_frame_alloc();
-    if (!picture)
-        return NULL;
-
-    picture->format = pix_fmt;
-    picture->width  = width;
-    picture->height = height;
-
-    /* allocate the buffers for the frame data */
-    ret = av_frame_get_buffer(picture, 32);
-    if (ret < 0) {
-        fprintf(stderr, "Could not allocate frame data.\n");
-        exit(1);
-    }
-
-    return picture;
-}
 
 const enum AVCodecID codec_id = AV_CODEC_ID_H264;
 const int titleHeight = 72;
@@ -200,11 +178,8 @@ void ScreenRecorder::open_video(std::string filename){
     }
 
     /* Allocate the encoded raw picture. */
-    frame = alloc_picture(enc->pix_fmt, enc->width, enc->height);
-    if (!frame) {
-        ofLogError() << "Could not allocate picture";
-    }
-
+    frame = avpp::Frame(enc->pix_fmt, enc->width, enc->height);
+    
     /* copy the stream parameters to the muxer */
     ret = avcodec_parameters_from_context(st->codecpar, enc);
     if (ret < 0) {
@@ -264,7 +239,7 @@ void ScreenRecorder::stopRecordingMovie(){
             avio_close(oc->pb);
         }
         avcodec_free_context(&enc);
-        av_frame_free(&frame);
+        //av_frame_free(&frame.frame);
         avformat_free_context(oc);
     }
     isRecording = false;
@@ -277,18 +252,18 @@ void ScreenRecorder::update_video_frame(){
     static int64_t next_pts = 0;
     
     uint8_t *rgb;
-    const int in_linesize[1] = { 3 * frame->width };
+    const int in_linesize[1] = { 3 * frame.width() };
     
     rgb = pix.getData();
     sws_context = sws_getCachedContext(sws_context,
-            frame->width, frame->height, AV_PIX_FMT_RGB24,
-            frame->width, frame->height, enc->pix_fmt,
+            frame.width(), frame.height(), AV_PIX_FMT_RGB24,
+            frame.width(), frame.height(), enc->pix_fmt,
             0, NULL, NULL, NULL);
     sws_scale(sws_context, (const uint8_t * const *) &rgb, in_linesize, 0,
-            frame->height, frame->data, frame->linesize);
+            frame.height(), frame.dataPtr(), frame.linesize() );
     
     //frame->pts = next_pts++;
-    frame->pts = ofGetSystemTimeMicros() - movieStartTimeMicros;
+    frame.pts( ofGetSystemTimeMicros() - movieStartTimeMicros);
 
     return;
 }
@@ -314,9 +289,9 @@ void ScreenRecorder::draw( const ofFbo &fbo ){
     
     if( isRecording ){
         update_video_frame();
-        if (frame == NULL) ofLogError() << "NULL Frame";
+        if (frame.native() == NULL) ofLogError() << "NULL Frame";
         /* encode the image */
-        ret = avcodec_send_frame(enc, frame);
+        ret = avcodec_send_frame(enc, frame.native());
         if (ret < 0) {
             fprintf(stderr, "Error submitting a frame for encoding\n");
         }
