@@ -24,6 +24,7 @@ namespace avpp{
     public:
         Frame();
         Frame(enum AVPixelFormat pix_fmt, int width, int height);
+        ~Frame();
 
         int width() const;
         int height() const;

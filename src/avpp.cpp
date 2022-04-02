@@ -17,6 +17,9 @@ Frame::Frame(enum AVPixelFormat pix_fmt, int width, int height) {
     }
     ofLogError() << "Could not allocate frame data.";
 }
+Frame::~Frame(){
+    av_frame_free(&frame);
+}
 
 int Frame::width() const{
     if( frame ) return frame->width;
