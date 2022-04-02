@@ -42,6 +42,9 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
+# snyk
+.dccache
+
 # Project files
 example*/bin/*.exe
 example*/bin/*.dll
