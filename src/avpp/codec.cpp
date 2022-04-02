@@ -67,6 +67,17 @@ bool Encoder::setup( int width, int height, int fps ){
     return (avcodec_open2(enc, NULL, NULL) == 0);
 }
 
+bool Encoder::encode(Frame& f){
+    if( !enc ) return false;
+    return (avcodec_send_frame(enc, f.native()) == 0);
+}
+
+Encoder& Encoder::operator<<( Frame& f){
+    if( enc ) avcodec_send_frame(enc, f.native());
+    return *this;
+}
+
+
 
 AVCodecContext* Encoder::native(){
     return enc;

@@ -232,10 +232,13 @@ void ScreenRecorder::draw( const ofFbo &fbo ){
         update_video_frame();
         if (frame.native() == NULL) ofLogError() << "NULL Frame";
         /* encode the image */
-        ret = avcodec_send_frame(enc.native(), frame.native());
+        //enc << frame;
+        if( !enc.encode(frame) ) return; 
+        /*ret = avcodec_send_frame(enc.native(), frame.native());
         if (ret < 0) {
             fprintf(stderr, "Error submitting a frame for encoding\n");
-        }
+        }*/
+        ret = 0;
         while (ret >= 0) {
             AVPacket pkt = { 0 };
 

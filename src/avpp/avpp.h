@@ -20,6 +20,9 @@ extern "C"
 #endif
 
 namespace avpp{
+
+class Encoder;
+
 class Frame {
 public:
     Frame();
@@ -36,6 +39,8 @@ public:
     uint8_t** dataPtr();
     AVFrame* native();
 
+    friend Encoder& operator<<( Encoder& enc, Frame& f);
+
     AVFrame *frame;
 };
 
@@ -46,6 +51,8 @@ public:
     Encoder& operator=(Encoder&& other);
     
     bool setup( int width, int height, int fps );
+    bool encode( Frame& f);
+    Encoder& operator<<( Frame& f);
 
     AVCodecContext* native();
     AVCodecContext* operator -> () {
