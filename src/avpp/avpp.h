@@ -50,6 +50,7 @@ public:
     int width;
     int height;
     int fps;
+    bool hasGlobalHeader;
     AVCodecID codec_id;
 };
 
@@ -59,7 +60,7 @@ class Encoder {
 public:
     Encoder();
     ~Encoder();
-    Encoder& operator=(Encoder&& other);
+    //Encoder& operator=(Encoder&& other);
     
     bool setup( int width, int height, int fps );
     bool setup(const EncoderSettings& settings);
@@ -119,7 +120,7 @@ public:
     bool hasGlobalHeader();
 
     void addStream(Encoder& enc);
-    //void addStream(const EncoderSettings& settings);
+    void addStream(const EncoderSettings& settings);
     
     Stream& operator[](std::size_t idx);
     const Stream& operator[](std::size_t idx) const;
@@ -139,20 +140,25 @@ public:
 class Stream {
 public:
     Stream();
+    Stream( AVFormatContext *fmtctx, const EncoderSettings& settings );
     Stream( AVStream* stream);
     ~Stream();
     
     int index();
 
-    bool setupEncoder( int width, int height, int fps );
+    bool setupEncoder( const EncoderSettings& settings );
     bool encode( Frame& f);
+    const Encoder& getEncoder();
+
+    AVPacket* getPacket() { return pkt;}
     //Stream& operator<<( Frame& f);
 
     AVRational timebase();
 
     AVStream *st;
     AVPacket* pkt;
-    AVCodecContext *enc;
+    AVFormatContext *fmtctx;
+    Encoder enc2;
 };
 
 }

@@ -31,7 +31,6 @@ ScreenRecorder::ScreenRecorder(){
     //legendHeight = ( legendFont.getAscenderHeight() - legendFont.getDescenderHeight() ) * 1.2;
     //legendAnchor = legendFont.getAscenderHeight() * 1.2;
     setupCompleted = false;
-    isRecording = false;
 }
 
 //===============================================================================
@@ -127,30 +126,17 @@ void ScreenRecorder::open_video(std::string filename){
     settings.fps = fps;
 
     enc.setup( settings );
-    /* Some formats want stream headers to be separate. */
-    //if (fmt.hasGlobalHeader()) enc->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
-
+    
     /* Allocate the encoded raw picture. */
     frame = avpp::Frame(enc->pix_fmt, settings.width, settings.height);
 
-    fmt.addStream(enc);
-    //st = fmt.getStream();
-    //st = avpp::Stream(fmt,enc);
-
+    fmt.addStream( settings );
+    
     av_dump_format(fmt.native(), 0, filename.c_str(), 1);
 
     if( !fmt.startRecording() ){
         ofLogError() << "Recording can not be started";
     }
-    /*if (isFileFormat) {
-        if (avio_open(&oc->pb, filename.c_str(), AVIO_FLAG_WRITE) < 0) {
-            ofLogError() << "Could not open '" << filename <<"'";
-        }
-    }*/
-
-    /* Write the stream header, if any. */
-    //avformat_write_header(oc, NULL);
-    isRecording = fmt.isRecording;
 }
 
 //===============================================================================
@@ -186,7 +172,6 @@ void ScreenRecorder::startRecordingMovie( std::string filename ){
 //===============================================================================
 void ScreenRecorder::stopRecordingMovie(){
     fmt.stopRecording();
-    isRecording = fmt.isRecording;
 }
 
 //===============================================================================
@@ -230,13 +215,17 @@ void ScreenRecorder::draw( const ofFbo &fbo ){
         fbo.draw( compositingFboLeft, titleHeight, frameWidth, frameHeight );
     compositingFbo.end();
     compositingFbo.readToPixels( pix );
-    
-    if( isRecording ){
+    enc= fmt[0].getEncoder();
+    AVPacket* pkt = av_packet_alloc();
+    if( fmt.isRecording ){
         update_video_frame();
         if (frame.native() == NULL) ofLogError() << "NULL Frame";
         /* encode the image */
         //enc << frame;
-        if( !enc.encode(frame) ) return; 
+        
+        //if( !enc.encode(frame) ) return; 
+        fmt[0].encode(frame);
+        return;
         /*ret = avcodec_send_frame(enc.native(), frame.native());
         if (ret < 0) {
             fprintf(stderr, "Error submitting a frame for encoding\n");
@@ -246,7 +235,7 @@ void ScreenRecorder::draw( const ofFbo &fbo ){
             //AVPacket pkt = { 0 };
 
             //av_init_packet(&pkt);
-            AVPacket* pkt = av_packet_alloc();
+            
             ret = avcodec_receive_packet(enc.native(), pkt);
             if (ret < 0 && ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
                 fprintf(stderr, "Error encoding a video frame\n");

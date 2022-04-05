@@ -8,8 +8,11 @@ Container::Container() {
 }
 Container::~Container(){
     stopRecording();
+    ofLogError()<<__FILE__<<"@"<<__LINE__;
     streams.clear();
+    ofLogError()<<__FILE__<<"@"<<__LINE__;
     avformat_free_context(oc);
+    ofLogError()<<__FILE__<<"@"<<__LINE__;
 }
 
 Container& Container::operator=(Container&& other){
@@ -42,8 +45,15 @@ void Container::addStream(Encoder& enc){
         if( hasGlobalHeader() ) enc->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
         /* copy the stream parameters to the muxer */
         avcodec_parameters_from_context(st->codecpar, enc.native());
-        streams.emplace_back(Stream(st));
+        Stream s(st);
+        streams.emplace_back(s);
     }
+}
+
+
+void Container::addStream(const EncoderSettings& settings){
+    Stream s(oc,settings);
+    streams.emplace_back(s);
 }
 
 

@@ -17,15 +17,17 @@ Encoder::Encoder(): enc(NULL){
 }
 
 
-Encoder& Encoder::operator=(Encoder&& other) {
+/*Encoder& Encoder::operator=(Encoder&& other) {
     enc = other.enc;
     other.enc = NULL;
     return *this;
-}
+}*/
 
 
 Encoder::~Encoder(){
-    if( enc ) avcodec_free_context(&enc);
+    ofLogError()<<__FILE__<<"@"<<__LINE__;
+    //if( enc ) avcodec_free_context(&enc);
+    ofLogError()<<__FILE__<<"@"<<__LINE__;
 }
 
 
@@ -92,6 +94,9 @@ bool Encoder::setup(const EncoderSettings& settings){
         ofLogError() << "setup_encoder : codec not found"; 
         return false;
     }
+
+    /* Some formats want stream headers to be separate. */
+    if( settings.hasGlobalHeader ) enc->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
     
     /* Put sample parameters. */
     enc->bit_rate = 4000000;
