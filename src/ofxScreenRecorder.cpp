@@ -89,9 +89,7 @@ void ScreenRecorder::addLogo(ofImage newLogo){
 void ScreenRecorder::open_video(std::string filename){
     int ret;
 
-    /* Setup the encoder */
-    int fps = 30;
-    enc = avpp::Encoder();
+    
 
     /* Allocate the output context for the muxer */
     //oc = avformat_alloc_context();
@@ -113,18 +111,27 @@ void ScreenRecorder::open_video(std::string filename){
     //isFileFormat = !(oc->oformat->flags & AVFMT_NOFILE);
     isFileFormat = fmt.isFileFormat();
 
-       /* Some formats want stream headers to be separate. */
-    if (fmt.hasGlobalHeader()) enc->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+    
 
     //add_video_stream();
     //st = avpp::Stream(fmt,enc);
 
-
+    /* Setup the encoder */
+    int fps = 30;
+    enc = avpp::Encoder();
     /* open the codec */
-    enc.setup( compositingFbo.getWidth(), compositingFbo.getHeight(), fps);
+    avpp::EncoderSettings settings;
+    settings.codec_id = AV_CODEC_ID_H264;
+    settings.width = compositingFbo.getWidth();
+    settings.height = compositingFbo.getHeight();
+    settings.fps = fps;
+
+    enc.setup( settings );
+    /* Some formats want stream headers to be separate. */
+    //if (fmt.hasGlobalHeader()) enc->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
     /* Allocate the encoded raw picture. */
-    frame = avpp::Frame(enc->pix_fmt, enc->width, enc->height);
+    frame = avpp::Frame(enc->pix_fmt, settings.width, settings.height);
 
     fmt.addStream(enc);
     //st = fmt.getStream();

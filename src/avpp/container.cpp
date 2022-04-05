@@ -38,6 +38,8 @@ bool Container::hasGlobalHeader(){
 void Container::addStream(Encoder& enc){
     if( AVStream* st = avformat_new_stream(oc, NULL)){
         st->time_base = enc->time_base;
+        /* Some formats want stream headers to be separate. */
+        if( hasGlobalHeader() ) enc->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
         /* copy the stream parameters to the muxer */
         avcodec_parameters_from_context(st->codecpar, enc.native());
         streams.emplace_back(Stream(st));

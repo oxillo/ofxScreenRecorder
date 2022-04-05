@@ -45,6 +45,14 @@ public:
     AVFrame *frame;
 };
 
+class EncoderSettings {
+public:
+    int width;
+    int height;
+    int fps;
+    AVCodecID codec_id;
+};
+
 
 
 class Encoder {
@@ -54,6 +62,7 @@ public:
     Encoder& operator=(Encoder&& other);
     
     bool setup( int width, int height, int fps );
+    bool setup(const EncoderSettings& settings);
     bool encode( Frame& f);
     Encoder& operator<<( Frame& f);
 
@@ -110,7 +119,7 @@ public:
     bool hasGlobalHeader();
 
     void addStream(Encoder& enc);
-    const Stream getStream();
+    //void addStream(const EncoderSettings& settings);
     
     Stream& operator[](std::size_t idx);
     const Stream& operator[](std::size_t idx) const;
