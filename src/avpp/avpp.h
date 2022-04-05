@@ -18,6 +18,7 @@ extern "C"
 #ifdef __cplusplus
 }
 #endif
+#include "ofLog.h"
 
 namespace avpp{
 
@@ -44,6 +45,8 @@ public:
     AVFrame *frame;
 };
 
+
+
 class Encoder {
 public:
     Encoder();
@@ -58,6 +61,88 @@ public:
     AVCodecContext* operator -> () {
         return enc;
     }
+
+    //Packet& Encoder::getPacket();
+
+private:
+    AVCodecContext *enc;
+    //Packet pkt;
+};
+
+
+
+class Packet {
+public:
+    Packet() {
+        pkt = av_packet_alloc();
+    }
+    ~Packet(){
+        av_packet_free(&pkt);
+    }
+
+    /*int receiveFrom(Encoder enc){
+        ret = avcodec_receive_packet(enc.native(), pkt);
+            if (ret < 0 && ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
+                fprintf(stderr, "Error encoding a video frame\n");
+            } else if (ret >= 0) {
+    }*/
+
+    AVPacket* native(){
+        return pkt;
+    }
+
+    AVPacket* pkt;
+};
+
+class Stream;
+
+class Container {
+public:
+    Container();
+    ~Container();
+
+    Container& operator=(Container&& other);
+
+    bool fromShortName(std::string name);
+    bool fromFilename(std::string name);
+
+    bool isFileFormat();
+    bool hasGlobalHeader();
+
+    void addStream(Encoder& enc);
+    const Stream getStream();
+    
+    Stream& operator[](std::size_t idx);
+    const Stream& operator[](std::size_t idx) const;
+
+    bool startRecording();
+    bool stopRecording();
+
+    
+    AVFormatContext* native();
+
+    bool isRecording;
+    std::vector<Stream> streams;
+    AVFormatContext *oc;
+    std::string filename;
+};
+
+class Stream {
+public:
+    Stream();
+    Stream( AVStream* stream);
+    ~Stream();
+    
+    int index();
+
+    bool setupEncoder( int width, int height, int fps );
+    bool encode( Frame& f);
+    //Stream& operator<<( Frame& f);
+
+    AVRational timebase();
+
+    AVStream *st;
+    AVPacket* pkt;
     AVCodecContext *enc;
 };
 

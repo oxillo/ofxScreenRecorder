@@ -1,6 +1,6 @@
 #include "ofxScreenRecorder.h"
 
-#define DEBUG ofLogNotice() << "Line " << __LINE__;
+#define DEBUG ofLogNotice() <<__FILE__ << ": Line " << __LINE__;
 
 #define OFX_ADDON "ofxScreenRecorder"
 
@@ -38,6 +38,7 @@ ScreenRecorder::ScreenRecorder(){
 bool ScreenRecorder::setup( int width, int height ){
 
     /* Stop movie recording if active */
+
     stopRecordingMovie();
 
     /* Keep track of the expected size of the rendered frame */
@@ -69,18 +70,18 @@ void ScreenRecorder::addLogo(ofImage newLogo){
 
 //===============================================================================
 /* Add a video output stream. */
-bool ScreenRecorder::add_video_stream(){
+/*bool ScreenRecorder::add_video_stream(){
     
-    st = avformat_new_stream(oc, NULL);
-    if (!st) {
+    st.st = avformat_new_stream(oc, NULL);
+    if (!st.st) {
         ofLogError(OFX_ADDON) << "add_video_stream : could not allocate stream";
         return false;
     }
 
-    st->time_base = enc->time_base;
+    st.st->time_base = enc->time_base;
     
     return true;
-}
+}*/
 
 //===============================================================================
 
@@ -93,26 +94,30 @@ void ScreenRecorder::open_video(std::string filename){
     enc = avpp::Encoder();
 
     /* Allocate the output context for the muxer */
-    oc = avformat_alloc_context();
+    //oc = avformat_alloc_context();
+    //fmt = avpp::Container();
+    if( !fmt.fromFilename(filename) ) fmt.fromShortName("mp4");
+    /*avformat_alloc_output_context2( &oc, NULL, filename.c_str(), NULL);
     if (!oc) {
         ofLogError(OFX_ADDON) << "Could not allocate output context";
         return;
-    }
+    }*/
 
     /* Determine the output format of the muxer from the extension of the file name : using dummy.mp4 */
-    oc->oformat = av_guess_format(NULL, "dummy.mp4", NULL);
+    /*oc->oformat = av_guess_format(NULL, "dummy.mp4", NULL);
     if (!oc->oformat) {
         ofLogError(OFX_ADDON) << "Could not find suitable output format";
         return;
-    }
+    }*/
     /* Determine if the container is a file or a stream */
-    isFileFormat = !(oc->oformat->flags & AVFMT_NOFILE);
+    //isFileFormat = !(oc->oformat->flags & AVFMT_NOFILE);
+    isFileFormat = fmt.isFileFormat();
 
        /* Some formats want stream headers to be separate. */
-    if (oc->oformat->flags & AVFMT_GLOBALHEADER)
-        enc->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+    if (fmt.hasGlobalHeader()) enc->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
-    add_video_stream();
+    //add_video_stream();
+    //st = avpp::Stream(fmt,enc);
 
 
     /* open the codec */
@@ -120,24 +125,25 @@ void ScreenRecorder::open_video(std::string filename){
 
     /* Allocate the encoded raw picture. */
     frame = avpp::Frame(enc->pix_fmt, enc->width, enc->height);
-    
-    /* copy the stream parameters to the muxer */
-    ret = avcodec_parameters_from_context(st->codecpar, enc.native());
-    if (ret < 0) {
-        ofLogError() << "Could not copy the stream parameters";
+
+    fmt.addStream(enc);
+    //st = fmt.getStream();
+    //st = avpp::Stream(fmt,enc);
+
+    av_dump_format(fmt.native(), 0, filename.c_str(), 1);
+
+    if( !fmt.startRecording() ){
+        ofLogError() << "Recording can not be started";
     }
-
-    av_dump_format(oc, 0, filename.c_str(), 1);
-
-    if (isFileFormat) {
+    /*if (isFileFormat) {
         if (avio_open(&oc->pb, filename.c_str(), AVIO_FLAG_WRITE) < 0) {
             ofLogError() << "Could not open '" << filename <<"'";
         }
-    }
+    }*/
 
     /* Write the stream header, if any. */
-    avformat_write_header(oc, NULL);
-    isRecording = true;
+    //avformat_write_header(oc, NULL);
+    isRecording = fmt.isRecording;
 }
 
 //===============================================================================
@@ -157,7 +163,7 @@ void ScreenRecorder::snapshot(std::string filename){
 void ScreenRecorder::startRecordingMovie( std::string filename ){
     static int movieNumber = 0;
     /* Stop active recording if any */
-    if( isRecording ) stopRecordingMovie();
+    stopRecordingMovie();
 
     /* Build an automatic file name if needed */
     if( filename=="" ){
@@ -172,18 +178,8 @@ void ScreenRecorder::startRecordingMovie( std::string filename ){
 
 //===============================================================================
 void ScreenRecorder::stopRecordingMovie(){
-    /* Write the trailer and close the file if needed */
-    if( isRecording ){
-        av_write_trailer(oc);
-    
-        if( isFileFormat ){
-            avio_close(oc->pb);
-        }
-        //avcodec_free_context(&enc);
-        //av_frame_free(&frame.frame);
-        avformat_free_context(oc);
-    }
-    isRecording = false;
+    fmt.stopRecording();
+    isRecording = fmt.isRecording;
 }
 
 //===============================================================================
@@ -240,19 +236,18 @@ void ScreenRecorder::draw( const ofFbo &fbo ){
         }*/
         ret = 0;
         while (ret >= 0) {
-            AVPacket pkt = { 0 };
+            //AVPacket pkt = { 0 };
 
-            av_init_packet(&pkt);
-
-            ret = avcodec_receive_packet(enc.native(), &pkt);
+            //av_init_packet(&pkt);
+            AVPacket* pkt = av_packet_alloc();
+            ret = avcodec_receive_packet(enc.native(), pkt);
             if (ret < 0 && ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
                 fprintf(stderr, "Error encoding a video frame\n");
             } else if (ret >= 0) {
-                av_packet_rescale_ts(&pkt, enc->time_base, st->time_base);
-                pkt.stream_index = st->index;
-
+                av_packet_rescale_ts(pkt, enc->time_base, fmt[0].timebase());
+                pkt->stream_index = fmt[0].index();
                 /* Write the compressed frame to the media file. */
-                ret = av_interleaved_write_frame(oc, &pkt);
+                ret = av_interleaved_write_frame(fmt.native(), pkt);
                 if (ret < 0) {
                     fprintf(stderr, "Error while writing video frame\n");
                 }
@@ -262,8 +257,11 @@ void ScreenRecorder::draw( const ofFbo &fbo ){
 }
 
 ScreenRecorder::~ScreenRecorder() {
+    DEBUG
     stopRecordingMovie();
+    DEBUG
 }
+
 
 
 

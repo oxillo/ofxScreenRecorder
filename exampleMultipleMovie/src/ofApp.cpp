@@ -20,7 +20,7 @@ void ofApp::setup(){
     ofSetFrameRate(fps);
 
     ofSetVerticalSync(false);
-    ofLogToFile("record.log");
+    //ofLogToFile("record.log");
 }
 
 //--------------------------------------------------------------
@@ -61,6 +61,7 @@ void ofApp::draw(){
 
 //--------------------------------------------------------------
 void ofApp::exit(){
+    ofLogError()<<__FILE__ << "@" << __LINE__;
     recorder.stopRecordingMovie();
 }
 

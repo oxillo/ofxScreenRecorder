@@ -1,35 +1,40 @@
 #include "avpp.h"
-#include "ofLog.h"
 
 namespace avpp{
-    
-//Encoder::Encoder(AVCodecID codec_id): enc(NULL){
-Encoder::Encoder(): enc(NULL){
+Stream::Stream(){
+    pkt = av_packet_alloc();;
+}
+
+Stream::Stream( AVStream* stream){
+    pkt = av_packet_alloc();
+    st = stream;
+}
+
+Stream::~Stream() {
+    ofLogError()<<__FILE__<<"@"<<__LINE__;
+    //if( pkt ) av_packet_free(&pkt);
+    ofLogError()<<__FILE__<<"@"<<__LINE__;
+}
+
+int Stream::index(){
+    if( st ) return st->index;
+    return -1;
+}
+
+AVRational Stream::timebase(){
+    if( st ) return st->time_base;
+    return { 1, 1 };
+}
+
+
+bool Stream::setupEncoder( int width, int height, int fps ){
     AVCodecID codec_id = AV_CODEC_ID_H264;
     AVCodec *codec = avcodec_find_encoder( codec_id );
     //avcodec_find_encoder_by_name
-    if( codec ){
-        enc = avcodec_alloc_context3( codec );
-        if( enc ) return;
-    }
-    ofLogError() << "setup_encoder : codec not found"; 
-    //avcodec_find_encoder_by_name
-}
-
-Encoder& Encoder::operator=(Encoder&& other) {
-    enc = other.enc;
-    other.enc = NULL;
-    return *this;
-}
-
-
-Encoder::~Encoder(){
-    if( enc ) avcodec_free_context(&enc);
-}
-
-
-bool Encoder::setup( int width, int height, int fps ){
-    if( !enc ) return false;
+    if( !codec ) return false;
+    enc = avcodec_alloc_context3( codec );
+    if( enc ) return false;
+    
     /* Put sample parameters. */
     enc->bit_rate = 4000000;
     /* Resolution must be a multiple of two. */
@@ -67,27 +72,11 @@ bool Encoder::setup( int width, int height, int fps ){
     return (avcodec_open2(enc, NULL, NULL) == 0);
 }
 
-bool Encoder::encode(Frame& f){
+bool Stream::encode( Frame& f){
     if( !enc ) return false;
     return (avcodec_send_frame(enc, f.native()) == 0);
 }
 
-Encoder& Encoder::operator<<( Frame& f){
-    if( enc ) avcodec_send_frame(enc, f.native());
-    return *this;
-}
 
-/*Packet& Encoder::getPacket(){
-    int ret = avcodec_receive_packet(enc.native(), pkt.native());
-            if (ret < 0 && ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
-                fprintf(stderr, "Error encoding a video frame\n");
-            } else if (ret >= 0) {
-}*/
-
-
-
-AVCodecContext* Encoder::native(){
-    return enc;
-}
 
 } // namespace avpp

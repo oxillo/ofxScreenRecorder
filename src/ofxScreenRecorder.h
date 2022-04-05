@@ -127,9 +127,10 @@ private :
 
 
     AVFormatContext *oc;
+    avpp::Container fmt;
     //AVCodecContext *enc;
     avpp::Encoder enc;
-    AVStream *st;
+    //avpp::Stream st;
     //AVFrame *frame;
     avpp::Frame frame;
     uint64_t movieStartTimeMicros;
