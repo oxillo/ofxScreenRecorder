@@ -19,6 +19,10 @@ extern "C"
 }
 #endif
 #include "ofLog.h"
+#include "graphics/ofPixels.h"
+
+
+#define TRACE_VERBOSE ofLogVerbose()<<__FILE__<<"@"<<__LINE__<<" - " << __PRETTY_FUNCTION__ ;
 
 namespace avpp{
 
@@ -29,9 +33,13 @@ public:
     Frame();
     Frame(enum AVPixelFormat pix_fmt, int width, int height);
     Frame(const Frame &other) = delete; // no copy
+    //Frame(Frame &&) = default; // Default move constructor
+    Frame(Frame &&);
     ~Frame();
 
     Frame& operator=(Frame&& other);
+
+    bool setup(enum AVPixelFormat pix_fmt, int width, int height);
 
     int width() const;
     int height() const;
@@ -40,9 +48,12 @@ public:
     uint8_t** dataPtr();
     AVFrame* native();
 
+    bool encode( const ofPixels &pix );
+
     friend Encoder& operator<<( Encoder& enc, Frame& f);
 
     AVFrame *frame;
+    struct SwsContext *sws_context;
 };
 
 class EncoderSettings {
@@ -59,12 +70,16 @@ public:
 class Encoder {
 public:
     Encoder();
+    //Encoder(Encoder &&) = default; // Default move constructor
+    Encoder(Encoder &&);
+    //Encoder& operator=(Encoder&& other) = default;
     ~Encoder();
-    //Encoder& operator=(Encoder&& other);
-    
+
     bool setup( int width, int height, int fps );
     bool setup(const EncoderSettings& settings);
     bool encode( Frame& f);
+    bool encode( const ofPixels &pix );
+    //bool encode( const std::vector<uint8_t> &pix );
     Encoder& operator<<( Frame& f);
 
     AVCodecContext* native();
@@ -76,6 +91,7 @@ public:
 
 private:
     AVCodecContext *enc;
+    Frame frame;
     //Packet pkt;
 };
 
@@ -109,6 +125,8 @@ class Stream;
 class Container {
 public:
     Container();
+    Container(const Container &other) = delete; // No copy
+    Container(Container &&) = default; // Default move constructor
     ~Container();
 
     Container& operator=(Container&& other);
@@ -119,7 +137,7 @@ public:
     bool isFileFormat();
     bool hasGlobalHeader();
 
-    void addStream(Encoder& enc);
+    //void addStream(Encoder& enc);
     void addStream(const EncoderSettings& settings);
     
     Stream& operator[](std::size_t idx);
@@ -140,6 +158,9 @@ public:
 class Stream {
 public:
     Stream();
+    Stream(const Stream &other) = delete; // No copy
+    //Stream(Stream &&) = default; // Default move constructor
+    Stream(Stream &&); // Default move constructor
     Stream( AVFormatContext *fmtctx, const EncoderSettings& settings );
     Stream( AVStream* stream);
     ~Stream();
@@ -148,6 +169,7 @@ public:
 
     bool setupEncoder( const EncoderSettings& settings );
     bool encode( Frame& f);
+    bool encode( const ofPixels &pix);
     const Encoder& getEncoder();
 
     AVPacket* getPacket() { return pkt;}

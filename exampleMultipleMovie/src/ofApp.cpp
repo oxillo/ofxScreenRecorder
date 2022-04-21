@@ -61,7 +61,6 @@ void ofApp::draw(){
 
 //--------------------------------------------------------------
 void ofApp::exit(){
-    ofLogError()<<__FILE__ << "@" << __LINE__;
     recorder.stopRecordingMovie();
 }
 

@@ -126,13 +126,7 @@ private :
     float logoLeft;         //< X position of logo
 
 
-    AVFormatContext *oc;
     avpp::Container fmt;
-    //AVCodecContext *enc;
-    avpp::Encoder enc;
-    //avpp::Stream st;
-    //AVFrame *frame;
-    avpp::Frame frame;
     uint64_t movieStartTimeMicros;
     
 	std::string recorderTitle;

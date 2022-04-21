@@ -1,9 +1,22 @@
 #include "avpp.h"
 
 namespace avpp{
-Stream::Stream(){
-    pkt = av_packet_alloc();;
+Stream::Stream():st(nullptr),pkt(nullptr), fmtctx(nullptr){
+    ofLogError()<<__FILE__<<"@"<<__LINE__;
 }
+
+
+Stream::Stream(Stream && other):enc2(std::move(other.enc2)){
+    st = other.st;
+    other.st = nullptr;
+    pkt = other.pkt;
+    other.pkt = nullptr;
+    fmtctx = other.fmtctx;
+    other.fmtctx = nullptr;
+}
+/*Stream::Stream(const Stream &other){
+    
+}*/
 
 Stream::Stream( AVFormatContext *oc, const EncoderSettings& settings ){
     fmtctx = oc;
@@ -20,9 +33,7 @@ Stream::Stream( AVStream* stream){
 }
 
 Stream::~Stream() {
-    ofLogError()<<__FILE__<<"@"<<__LINE__;
     //if( pkt ) av_packet_free(&pkt);
-    ofLogError()<<__FILE__<<"@"<<__LINE__;
 }
 
 int Stream::index(){
@@ -49,6 +60,7 @@ const Encoder& Stream::getEncoder(){
 }
 
 bool Stream::encode( Frame& f){
+    ofLogError()<<__FILE__<<"@"<<__LINE__;
     if (!enc2.encode(f)) {
         ofLogError()<<__FILE__<<"@"<<__LINE__;
         return false;
@@ -70,6 +82,32 @@ bool Stream::encode( Frame& f){
             ofLogError()<<__FILE__<<"@"<<__LINE__;
             ret = av_interleaved_write_frame(fmtctx, pkt);
             ofLogError()<<__FILE__<<"@"<<__LINE__;
+            if (ret < 0) {
+                fprintf(stderr, "Error while writing video frame\n");
+            }
+        }
+    }
+    return true;
+    /*if( !enc ) return false;
+    return (avcodec_send_frame(enc, f.native()) == 0);*/
+}
+
+bool Stream::encode( const ofPixels &pix){
+    if (!enc2.encode(pix)) {
+        ofLogError()<<__FILE__<<"@"<<__LINE__;
+        return false;
+    }
+    int ret = 0;
+    while (ret >= 0) {
+        ret = avcodec_receive_packet(enc2.native(), pkt);
+        ofLogVerbose()<<__FILE__<<"@"<<__LINE__<<" - " << __PRETTY_FUNCTION__ ;
+        if (ret < 0 && ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
+            fprintf(stderr, "Error encoding a video frame\n");
+        } else if (ret >= 0) {
+            av_packet_rescale_ts(pkt, enc2->time_base, st->time_base);
+            pkt->stream_index = st->index;
+            /* Write the compressed frame to the media file. */
+            ret = av_interleaved_write_frame(fmtctx, pkt);
             if (ret < 0) {
                 fprintf(stderr, "Error while writing video frame\n");
             }

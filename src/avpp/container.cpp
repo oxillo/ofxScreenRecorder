@@ -4,15 +4,9 @@ namespace avpp{
     
 Container::Container() {
     isRecording = false;
-    //oc = avformat_alloc_context()
 }
 Container::~Container(){
     stopRecording();
-    ofLogError()<<__FILE__<<"@"<<__LINE__;
-    streams.clear();
-    ofLogError()<<__FILE__<<"@"<<__LINE__;
-    avformat_free_context(oc);
-    ofLogError()<<__FILE__<<"@"<<__LINE__;
 }
 
 Container& Container::operator=(Container&& other){
@@ -22,6 +16,7 @@ Container& Container::operator=(Container&& other){
 }
 
 bool Container::fromShortName(std::string name){
+    ofLogError()<<__FILE__<<"@"<<__LINE__;
     return (avformat_alloc_output_context2( &oc, NULL, name.c_str(), NULL) >= 0);
 }
 
@@ -38,22 +33,11 @@ bool Container::hasGlobalHeader(){
     return (oc->oformat->flags & AVFMT_GLOBALHEADER);
 }
 
-void Container::addStream(Encoder& enc){
-    if( AVStream* st = avformat_new_stream(oc, NULL)){
-        st->time_base = enc->time_base;
-        /* Some formats want stream headers to be separate. */
-        if( hasGlobalHeader() ) enc->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
-        /* copy the stream parameters to the muxer */
-        avcodec_parameters_from_context(st->codecpar, enc.native());
-        Stream s(st);
-        streams.emplace_back(s);
-    }
-}
 
 
 void Container::addStream(const EncoderSettings& settings){
     Stream s(oc,settings);
-    streams.emplace_back(s);
+    streams.emplace_back( std::move(s) );
 }
 
 
@@ -62,6 +46,7 @@ Stream& Container::operator[](std::size_t idx){
 }
 
 const Stream& Container::operator[](std::size_t idx) const{
+    ofLogError()<<__FILE__<<"@"<<__LINE__;
     return streams[idx];
 }
 
@@ -82,6 +67,11 @@ bool Container::stopRecording(){
         if( isFileFormat() ){
             avio_close(oc->pb);
         }
+    }
+    streams.clear();
+    if(oc) {
+        avformat_free_context(oc);
+        oc = nullptr;
     }
     isRecording = false;
     return true;

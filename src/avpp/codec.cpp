@@ -4,7 +4,7 @@
 namespace avpp{
     
 //Encoder::Encoder(AVCodecID codec_id): enc(NULL){
-Encoder::Encoder(): enc(NULL){
+Encoder::Encoder(): enc(nullptr){
     /*AVCodecID codec_id = AV_CODEC_ID_H264;
     AVCodec *codec = avcodec_find_encoder( codec_id );
     //avcodec_find_encoder_by_name
@@ -16,6 +16,11 @@ Encoder::Encoder(): enc(NULL){
     //avcodec_find_encoder_by_name*/
 }
 
+Encoder::Encoder( Encoder &&other ) : frame( std::move(other.frame) ){
+    enc = other.enc;
+    other.enc = nullptr; 
+    
+}
 
 /*Encoder& Encoder::operator=(Encoder&& other) {
     enc = other.enc;
@@ -25,9 +30,7 @@ Encoder::Encoder(): enc(NULL){
 
 
 Encoder::~Encoder(){
-    ofLogError()<<__FILE__<<"@"<<__LINE__;
-    //if( enc ) avcodec_free_context(&enc);
-    ofLogError()<<__FILE__<<"@"<<__LINE__;
+    if( enc ) avcodec_free_context(&enc);
 }
 
 
@@ -43,6 +46,7 @@ bool Encoder::setup( int width, int height, int fps ){
     //avcodec_find_encoder_by_name
     if( codec ){
         enc = avcodec_alloc_context3( codec );
+        ofLogError()<<__FILE__<<"@"<<__LINE__;
         if( !enc ) return false;
     }
     ofLogError() << "setup_encoder : codec not found"; 
@@ -82,6 +86,7 @@ bool Encoder::setup( int width, int height, int fps ){
     if( enc->codec_id == AV_CODEC_ID_H265 ){
         av_opt_set(enc->priv_data, "preset", "fast", 0);
     }
+    ofLogError()<<__FILE__<<"@"<<__LINE__;
     return (avcodec_open2(enc, NULL, NULL) == 0);
 }
 
@@ -132,8 +137,11 @@ bool Encoder::setup(const EncoderSettings& settings){
     if( enc->codec_id == AV_CODEC_ID_H265 ){
         av_opt_set(enc->priv_data, "preset", "fast", 0);
     }
-    return (avcodec_open2(enc, NULL, NULL) == 0);
     
+
+    int ret = avcodec_open2(enc, NULL, NULL);
+    frame.setup(enc->pix_fmt, enc->width, enc->height);
+    return (ret == 0);
     //avcodec_find_encoder_by_name
 }
 
@@ -141,6 +149,17 @@ bool Encoder::encode(Frame& f){
     if( !enc ) return false;
     return (avcodec_send_frame(enc, f.native()) == 0);
 }
+
+bool Encoder::encode( const ofPixels &pix ){
+    if( !enc ) return false;
+    if( !frame.encode(pix) ) return false;
+    return (avcodec_send_frame(enc, frame.native()) == 0);
+}
+
+/*bool Encoder::encode( const std::vector<uint8_t> &pix ){
+    if( !enc ) return false;
+    return true;
+}*/
 
 Encoder& Encoder::operator<<( Frame& f){
     if( enc ) avcodec_send_frame(enc, f.native());
