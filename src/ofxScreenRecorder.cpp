@@ -86,48 +86,18 @@ void ScreenRecorder::addLogo(ofImage newLogo){
 
 //===============================================================================
 void ScreenRecorder::open_video(std::string filename){
-    int ret;
 
-    
-
-    /* Allocate the output context for the muxer */
-    //oc = avformat_alloc_context();
-    //fmt = avpp::Container();
     if( !fmt.fromFilename(filename) ) fmt.fromShortName("mp4");
-    /*avformat_alloc_output_context2( &oc, NULL, filename.c_str(), NULL);
-    if (!oc) {
-        ofLogError(OFX_ADDON) << "Could not allocate output context";
-        return;
-    }*/
-
-    /* Determine the output format of the muxer from the extension of the file name : using dummy.mp4 */
-    /*oc->oformat = av_guess_format(NULL, "dummy.mp4", NULL);
-    if (!oc->oformat) {
-        ofLogError(OFX_ADDON) << "Could not find suitable output format";
-        return;
-    }*/
-    /* Determine if the container is a file or a stream */
-    //isFileFormat = !(oc->oformat->flags & AVFMT_NOFILE);
-    isFileFormat = fmt.isFileFormat();
-
     
-
-    //add_video_stream();
-    //st = avpp::Stream(fmt,enc);
-
     /* Setup the encoder */
-    int fps = 30;
-    /* open the codec */
-    avpp::EncoderSettings settings;
+    avpp::VideoEncoderSettings settings;
     settings.codec_id = AV_CODEC_ID_H264;
     settings.width = compositingFbo.getWidth();
     settings.height = compositingFbo.getHeight();
-    settings.fps = fps;
+    settings.fps = 30;
 
-    //enc.setup( settings );
-    fmt.addStream( settings );
+    fmt.addVideoStream( settings );
     
-    av_dump_format(fmt.native(), 0, filename.c_str(), 1);
     if( !fmt.startRecording() ){
         ofLogError() << "Recording can not be started";
     }
@@ -189,7 +159,7 @@ void ScreenRecorder::draw( const ofFbo &fbo ){
     compositingFbo.end();
     compositingFbo.readToPixels( pix );
     
-    if( fmt.isRecording ){
+    if( fmt.isRecordingActive() ){
         fmt[0].encode(pix);
     }
 }

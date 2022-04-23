@@ -35,22 +35,30 @@ bool Container::hasGlobalHeader(){
 
 
 
-void Container::addStream(const EncoderSettings& settings){
-    Stream s(oc,settings);
-    streams.emplace_back( std::move(s) );
+void Container::addVideoStream(const VideoEncoderSettings& settings){
+    videoStreamsSettings.push_back( settings );
 }
 
+/*void Container::addStream(const EncoderSettings& settings){
+    streams.emplace_back( Stream{oc,settings} );
+}*/
 
-Stream& Container::operator[](std::size_t idx){
+
+VideoStream& Container::operator[](std::size_t idx){
     return streams[idx];
 }
 
-const Stream& Container::operator[](std::size_t idx) const{
+const VideoStream& Container::operator[](std::size_t idx) const{
     ofLogError()<<__FILE__<<"@"<<__LINE__;
     return streams[idx];
 }
 
 bool Container::startRecording(){
+    // Add streams
+    for (auto settings: videoStreamsSettings) {
+        streams.emplace_back( VideoStream{oc,settings} );
+    }
+    av_dump_format(oc, 0, filename.c_str(), 1);
     if( isFileFormat()  
         && avio_open(&oc->pb, filename.c_str(), AVIO_FLAG_WRITE) >= 0 ){
         /* Write the stream header, if any. */
@@ -77,9 +85,9 @@ bool Container::stopRecording(){
     return true;
 }
 
-AVFormatContext* Container::native(){
+/*AVFormatContext* Container::native(){
     return oc;
-}
+}*/
 
 
 } // namespace avpp

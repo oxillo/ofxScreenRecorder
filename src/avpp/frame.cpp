@@ -30,11 +30,11 @@ Frame::Frame( Frame &&other ){
 }
 
 
-Frame& Frame::operator=(Frame&& other) {
+/*Frame& Frame::operator=(Frame&& other) {
     frame = other.frame;
     other.frame = NULL;
     return *this;
-}
+}*/
 
 bool Frame::setup(enum AVPixelFormat pix_fmt, int width, int height){
     frame = av_frame_alloc();

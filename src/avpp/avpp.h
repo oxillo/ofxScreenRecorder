@@ -22,7 +22,6 @@ extern "C"
 #include "graphics/ofPixels.h"
 
 
-#define TRACE_VERBOSE ofLogVerbose()<<__FILE__<<"@"<<__LINE__<<" - " << __PRETTY_FUNCTION__ ;
 
 namespace avpp{
 
@@ -33,11 +32,10 @@ public:
     Frame();
     Frame(enum AVPixelFormat pix_fmt, int width, int height);
     Frame(const Frame &other) = delete; // no copy
-    //Frame(Frame &&) = default; // Default move constructor
-    Frame(Frame &&);
+    Frame(Frame &&);        // move constructor
     ~Frame();
 
-    Frame& operator=(Frame&& other);
+    //Frame& operator=(Frame&& other);
 
     bool setup(enum AVPixelFormat pix_fmt, int width, int height);
 
@@ -52,6 +50,7 @@ public:
 
     friend Encoder& operator<<( Encoder& enc, Frame& f);
 
+private:
     AVFrame *frame;
     struct SwsContext *sws_context;
 };
@@ -65,18 +64,37 @@ public:
     AVCodecID codec_id;
 };
 
+class VideoEncoderSettings {
+public:
+    int width;
+    int height;
+    int fps;
+    bool hasGlobalHeader;
+    AVCodecID codec_id;
+};
+
+class AudioEncoderSettings {
+public:
+    bool hasGlobalHeader;
+    AVCodecID codec_id;
+};
+
+class ContainerSettings {
+public:
+    std::vector<VideoEncoderSettings> videoStreams;
+};
+
 
 
 class Encoder {
 public:
     Encoder();
     //Encoder(Encoder &&) = default; // Default move constructor
-    Encoder(Encoder &&);
-    //Encoder& operator=(Encoder&& other) = default;
+    Encoder(Encoder &&);  //Move constructor
     ~Encoder();
 
-    bool setup( int width, int height, int fps );
     bool setup(const EncoderSettings& settings);
+    bool setup(const VideoEncoderSettings& settings);
     bool encode( Frame& f);
     bool encode( const ofPixels &pix );
     //bool encode( const std::vector<uint8_t> &pix );
@@ -87,8 +105,6 @@ public:
         return enc;
     }
 
-    //Packet& Encoder::getPacket();
-
 private:
     AVCodecContext *enc;
     Frame frame;
@@ -97,30 +113,9 @@ private:
 
 
 
-class Packet {
-public:
-    Packet() {
-        pkt = av_packet_alloc();
-    }
-    ~Packet(){
-        av_packet_free(&pkt);
-    }
-
-    /*int receiveFrom(Encoder enc){
-        ret = avcodec_receive_packet(enc.native(), pkt);
-            if (ret < 0 && ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
-                fprintf(stderr, "Error encoding a video frame\n");
-            } else if (ret >= 0) {
-    }*/
-
-    AVPacket* native(){
-        return pkt;
-    }
-
-    AVPacket* pkt;
-};
 
 class Stream;
+class VideoStream;
 
 class Container {
 public:
@@ -137,20 +132,22 @@ public:
     bool isFileFormat();
     bool hasGlobalHeader();
 
-    //void addStream(Encoder& enc);
-    void addStream(const EncoderSettings& settings);
+    //void addStream(const EncoderSettings& settings);
+    void addVideoStream(const VideoEncoderSettings& settings);
+    void addAudioStream(const AudioEncoderSettings& settings);
     
-    Stream& operator[](std::size_t idx);
-    const Stream& operator[](std::size_t idx) const;
+    VideoStream& operator[](std::size_t idx);
+    const VideoStream& operator[](std::size_t idx) const;
 
     bool startRecording();
     bool stopRecording();
+    bool isRecordingActive() { return isRecording;}
 
     
-    AVFormatContext* native();
-
+private:
+    std::vector<VideoEncoderSettings> videoStreamsSettings;
     bool isRecording;
-    std::vector<Stream> streams;
+    std::vector<VideoStream> streams;
     AVFormatContext *oc;
     std::string filename;
 };
@@ -159,28 +156,34 @@ class Stream {
 public:
     Stream();
     Stream(const Stream &other) = delete; // No copy
-    //Stream(Stream &&) = default; // Default move constructor
     Stream(Stream &&); // Default move constructor
-    Stream( AVFormatContext *fmtctx, const EncoderSettings& settings );
-    Stream( AVStream* stream);
     ~Stream();
     
     int index();
 
     bool setupEncoder( const EncoderSettings& settings );
-    bool encode( Frame& f);
     bool encode( const ofPixels &pix);
-    const Encoder& getEncoder();
+    
+    friend bool Container::startRecording();
 
-    AVPacket* getPacket() { return pkt;}
-    //Stream& operator<<( Frame& f);
-
-    AVRational timebase();
-
+protected:
+    Stream( AVFormatContext *fmtctx, const EncoderSettings& settings );
+//private:
     AVStream *st;
     AVPacket* pkt;
     AVFormatContext *fmtctx;
-    Encoder enc2;
+    Encoder enc;
+};
+
+class VideoStream : protected Stream{
+public:
+    VideoStream();
+    bool setupEncoder( const VideoEncoderSettings& settings );
+    bool encode( const ofPixels &pix);
+
+    friend bool Container::startRecording();
+protected:
+    VideoStream( AVFormatContext *fmtctx, const VideoEncoderSettings& settings );
 };
 
 }
