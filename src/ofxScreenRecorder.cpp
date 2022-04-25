@@ -90,8 +90,8 @@ void ScreenRecorder::open_video(std::string filename){
     if( !fmt.fromFilename(filename) ) fmt.fromShortName("mp4");
     
     /* Setup the encoder */
-    avpp::VideoEncoderSettings settings;
-    settings.codec_id = AV_CODEC_ID_H264;
+    auto  settings = avpp::VideoEncoderSettings::H264();
+    //settings.codec_id = AV_CODEC_ID_H264;
     settings.width = compositingFbo.getWidth();
     settings.height = compositingFbo.getHeight();
     settings.fps = 30;

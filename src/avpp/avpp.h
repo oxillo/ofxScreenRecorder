@@ -20,96 +20,18 @@ extern "C"
 #endif
 #include "ofLog.h"
 #include "graphics/ofPixels.h"
+#include "./codec.h"
 
 
 
 namespace avpp{
 
-class Encoder;
-
-class Frame {
-public:
-    Frame();
-    Frame(enum AVPixelFormat pix_fmt, int width, int height);
-    Frame(const Frame &other) = delete; // no copy
-    Frame(Frame &&);        // move constructor
-    ~Frame();
-
-    //Frame& operator=(Frame&& other);
-
-    bool setup(enum AVPixelFormat pix_fmt, int width, int height);
-
-    int width() const;
-    int height() const;
-    int* linesize() const;
-    void pts( int64_t timestamp);
-    uint8_t** dataPtr();
-    AVFrame* native();
-
-    bool encode( const ofPixels &pix );
-
-    friend Encoder& operator<<( Encoder& enc, Frame& f);
-
-private:
-    AVFrame *frame;
-    struct SwsContext *sws_context;
-};
-
-class EncoderSettings {
-public:
-    int width;
-    int height;
-    int fps;
-    bool hasGlobalHeader;
-    AVCodecID codec_id;
-};
-
-class VideoEncoderSettings {
-public:
-    int width;
-    int height;
-    int fps;
-    bool hasGlobalHeader;
-    AVCodecID codec_id;
-};
-
-class AudioEncoderSettings {
-public:
-    bool hasGlobalHeader;
-    AVCodecID codec_id;
-};
 
 class ContainerSettings {
 public:
     std::vector<VideoEncoderSettings> videoStreams;
 };
 
-
-
-class Encoder {
-public:
-    Encoder();
-    //Encoder(Encoder &&) = default; // Default move constructor
-    Encoder(Encoder &&);  //Move constructor
-    ~Encoder();
-
-    bool setup(const EncoderSettings& settings);
-    bool setup(const VideoEncoderSettings& settings);
-    bool encode( Frame& f);
-    bool encode( const ofPixels &pix );
-    //bool encode( const std::vector<uint8_t> &pix );
-    Encoder& operator<<( Frame& f);
-
-    AVCodecContext* native();
-    AVCodecContext* operator -> () {
-        return enc;
-    }
-
-private:
-    AVCodecContext *enc;
-    Frame frame;
-    //Packet pkt;
-};
 
 
 
@@ -161,7 +83,7 @@ public:
     
     int index();
 
-    bool setupEncoder( const EncoderSettings& settings );
+    //bool setupEncoder( const EncoderSettings& settings );
     bool encode( const ofPixels &pix);
     
     friend bool Container::startRecording();
@@ -179,11 +101,13 @@ class VideoStream : protected Stream{
 public:
     VideoStream();
     bool setupEncoder( const VideoEncoderSettings& settings );
+    bool setupEncoder( const VideoEncoderSettings* settings );
     bool encode( const ofPixels &pix);
 
     friend bool Container::startRecording();
 protected:
     VideoStream( AVFormatContext *fmtctx, const VideoEncoderSettings& settings );
+    VideoStream( AVFormatContext *fmtctx, const VideoEncoderSettings* settings );
 };
 
 }

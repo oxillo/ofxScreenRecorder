@@ -19,21 +19,30 @@ Stream::Stream(Stream && other):enc(std::move(other.enc)){
     other.fmtctx = nullptr;
 }
 
-Stream::Stream( AVFormatContext *oc, const EncoderSettings& settings ){
+/*Stream::Stream( AVFormatContext *oc, const EncoderSettings& settings ){
     fmtctx = oc;
     st = avformat_new_stream(fmtctx, NULL);
     auto encoderSettings = settings;
     encoderSettings.hasGlobalHeader = fmtctx->oformat->flags & AVFMT_GLOBALHEADER;
     setupEncoder(encoderSettings);
     pkt = av_packet_alloc();
-}
+}*/
 
 VideoStream::VideoStream( AVFormatContext *oc, const VideoEncoderSettings& settings ){
     fmtctx = oc;
     st = avformat_new_stream(fmtctx, NULL);
     auto encoderSettings = settings;
     encoderSettings.hasGlobalHeader = fmtctx->oformat->flags & AVFMT_GLOBALHEADER;
-    setupEncoder(encoderSettings);
+    setupEncoder(&encoderSettings);
+    pkt = av_packet_alloc();
+}
+
+VideoStream::VideoStream( AVFormatContext *oc, const VideoEncoderSettings* settings ){
+    fmtctx = oc;
+    st = avformat_new_stream(fmtctx, NULL);
+    //auto encoderSettings = settings;
+    //settings->hasGlobalHeader = fmtctx->oformat->flags & AVFMT_GLOBALHEADER;
+    setupEncoder(settings);
     pkt = av_packet_alloc();
 }
 
@@ -47,15 +56,23 @@ int Stream::index(){
 }
 
 
-bool Stream::setupEncoder( const EncoderSettings& settings ){
+/*bool Stream::setupEncoder( const EncoderSettings& settings ){
     enc.setup( settings );
+    st->time_base = enc->time_base;
+    // copy the stream parameters to the muxer 
+    avcodec_parameters_from_context(st->codecpar, enc.native());
+    return true;
+}*/
+
+bool VideoStream::setupEncoder( const VideoEncoderSettings& settings ){
+    enc.setup( &settings );
     st->time_base = enc->time_base;
     /* copy the stream parameters to the muxer */
     avcodec_parameters_from_context(st->codecpar, enc.native());
     return true;
 }
 
-bool VideoStream::setupEncoder( const VideoEncoderSettings& settings ){
+bool VideoStream::setupEncoder( const VideoEncoderSettings* settings ){
     enc.setup( settings );
     st->time_base = enc->time_base;
     /* copy the stream parameters to the muxer */
