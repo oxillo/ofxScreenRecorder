@@ -54,9 +54,10 @@ const VideoStream& Container::operator[](std::size_t idx) const{
 }
 
 bool Container::startRecording(){
-    // Add streams
-    for (auto settings: videoStreamsSettings) {
-        streams.emplace_back( VideoStream{oc,settings} );
+    containerSettings.hasGlobalHeader = oc->oformat->flags & AVFMT_GLOBALHEADER;
+    // Add video streams
+    for (auto streamSettings: videoStreamsSettings) {
+        streams.emplace_back( VideoStream{oc, streamSettings, &containerSettings} );
     }
     av_dump_format(oc, 0, filename.c_str(), 1);
     if( isFileFormat()  

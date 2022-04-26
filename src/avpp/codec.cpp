@@ -20,7 +20,7 @@ Encoder::~Encoder(){
 }
 
 
-bool Encoder::setup(const VideoEncoderSettings* settings){
+bool Encoder::setup(const VideoEncoderSettings* settings, const ContainerSettings* containerSettings){
     ofLogError()<<__FILE__<<"@"<<__LINE__;
     
     AVCodec *codec = avcodec_find_encoder( settings->getCodecId() );
@@ -35,7 +35,7 @@ bool Encoder::setup(const VideoEncoderSettings* settings){
     }
     ofLogError()<<__FILE__<<"@"<<__LINE__;
     /* Some formats want stream headers to be separate. */
-    if( settings->hasGlobalHeader ) enc->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+    if( containerSettings->hasGlobalHeader ) enc->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
     ofLogError()<<__FILE__<<"@"<<__LINE__;
     /* Put sample parameters. */
     enc->bit_rate = 4000000;

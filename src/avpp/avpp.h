@@ -27,12 +27,6 @@ extern "C"
 namespace avpp{
 
 
-class ContainerSettings {
-public:
-    std::vector<VideoEncoderSettings> videoStreams;
-};
-
-
 
 
 
@@ -68,6 +62,7 @@ public:
     
 private:
     std::vector<VideoEncoderSettings> videoStreamsSettings;
+    ContainerSettings containerSettings;
     bool isRecording;
     std::vector<VideoStream> streams;
     AVFormatContext *oc;
@@ -101,13 +96,13 @@ class VideoStream : protected Stream{
 public:
     VideoStream();
     bool setupEncoder( const VideoEncoderSettings& settings );
-    bool setupEncoder( const VideoEncoderSettings* settings );
+    bool setupEncoder( const VideoEncoderSettings* settings, const ContainerSettings *contSettings );
     bool encode( const ofPixels &pix);
 
     friend bool Container::startRecording();
 protected:
-    VideoStream( AVFormatContext *fmtctx, const VideoEncoderSettings& settings );
-    VideoStream( AVFormatContext *fmtctx, const VideoEncoderSettings* settings );
+    VideoStream( AVFormatContext *fmtctx, const VideoEncoderSettings& settings, ContainerSettings *contSettings );
+    VideoStream( AVFormatContext *fmtctx, const VideoEncoderSettings* settings, const ContainerSettings *contSettings );
 };
 
 }

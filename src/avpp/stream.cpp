@@ -28,21 +28,19 @@ Stream::Stream(Stream && other):enc(std::move(other.enc)){
     pkt = av_packet_alloc();
 }*/
 
-VideoStream::VideoStream( AVFormatContext *oc, const VideoEncoderSettings& settings ){
+VideoStream::VideoStream( AVFormatContext *oc, const VideoEncoderSettings& settings, ContainerSettings *contSettings ){
     fmtctx = oc;
     st = avformat_new_stream(fmtctx, NULL);
     auto encoderSettings = settings;
     encoderSettings.hasGlobalHeader = fmtctx->oformat->flags & AVFMT_GLOBALHEADER;
-    setupEncoder(&encoderSettings);
+    setupEncoder(&encoderSettings, contSettings );
     pkt = av_packet_alloc();
 }
 
-VideoStream::VideoStream( AVFormatContext *oc, const VideoEncoderSettings* settings ){
+VideoStream::VideoStream( AVFormatContext *oc, const VideoEncoderSettings* settings, const ContainerSettings *containerSettings ){
     fmtctx = oc;
     st = avformat_new_stream(fmtctx, NULL);
-    //auto encoderSettings = settings;
-    //settings->hasGlobalHeader = fmtctx->oformat->flags & AVFMT_GLOBALHEADER;
-    setupEncoder(settings);
+    setupEncoder( settings, containerSettings );
     pkt = av_packet_alloc();
 }
 
@@ -58,22 +56,25 @@ int Stream::index(){
 
 /*bool Stream::setupEncoder( const EncoderSettings& settings ){
     enc.setup( settings );
-    st->time_base = enc->time_base;
+    st->time_base = enc->time_base;ContainerSettings contSettings;
     // copy the stream parameters to the muxer 
     avcodec_parameters_from_context(st->codecpar, enc.native());
     return true;
 }*/
 
 bool VideoStream::setupEncoder( const VideoEncoderSettings& settings ){
-    enc.setup( &settings );
+    ContainerSettings *contSettings = new ContainerSettings();
+    contSettings->hasGlobalHeader = fmtctx->oformat->flags & AVFMT_GLOBALHEADER;
+    
+    enc.setup( &settings, contSettings );
     st->time_base = enc->time_base;
     /* copy the stream parameters to the muxer */
     avcodec_parameters_from_context(st->codecpar, enc.native());
     return true;
 }
 
-bool VideoStream::setupEncoder( const VideoEncoderSettings* settings ){
-    enc.setup( settings );
+bool VideoStream::setupEncoder( const VideoEncoderSettings* settings, const ContainerSettings *contSettings ){
+    enc.setup( settings, contSettings );
     st->time_base = enc->time_base;
     /* copy the stream parameters to the muxer */
     avcodec_parameters_from_context(st->codecpar, enc.native());
