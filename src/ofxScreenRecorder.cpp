@@ -1,4 +1,5 @@
 #include "ofxScreenRecorder.h"
+#include "avpp/settings.h"
 
 #define DEBUG ofLogError() <<__FILE__ << ": Line " << __LINE__;
 
@@ -90,7 +91,8 @@ void ScreenRecorder::open_video(std::string filename){
     if( !fmt.fromFilename(filename) ) fmt.fromShortName("mp4");
     
     /* Setup the encoder */
-    auto  settings = avpp::VideoEncoderSettings::H264();
+    //auto  settings = avpp::VideoEncoderSettings::H264();
+    avpp::H264EncoderSettings  settings;
     //settings.codec_id = AV_CODEC_ID_H264;
     settings.width = compositingFbo.getWidth();
     settings.height = compositingFbo.getHeight();

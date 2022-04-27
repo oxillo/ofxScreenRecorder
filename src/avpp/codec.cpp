@@ -23,9 +23,16 @@ Encoder::~Encoder(){
 bool Encoder::setup(const VideoEncoderSettings* settings, const ContainerSettings* containerSettings){
     ofLogError()<<__FILE__<<"@"<<__LINE__;
     
-    AVCodec *codec = avcodec_find_encoder( settings->getCodecId() );
+    AVCodec *codec = nullptr;
+    if( settings->getCodecName().length()>0 ){
+        codec = avcodec_find_encoder_by_name(settings->getCodecName().c_str());
+    }
+    if( !codec ){
+        codec = avcodec_find_encoder( settings->getCodecId() );
+    }
+    //AVCodec *codec = avcodec_find_encoder( settings->getCodecId() );
+    //AVCodec *codec = avcodec_find_encoder_by_name("libx264rgb");
     ofLogError()<<__FILE__<<"@"<<__LINE__;
-    //avcodec_find_encoder_by_name
     if( !codec ) return false;
     ofLogError()<<__FILE__<<"@"<<__LINE__;
     enc = avcodec_alloc_context3( codec );
@@ -50,7 +57,7 @@ bool Encoder::setup(const VideoEncoderSettings* settings, const ContainerSetting
     enc->time_base = (AVRational){ 1, 1000000}; // microseconds
 
     enc->gop_size      = 12; /* emit one intra frame every twelve frames at most */
-    enc->pix_fmt       = AV_PIX_FMT_YUV444P;
+    enc->pix_fmt       = settings->getPixelFormat();
     //enc->pix_fmt       = AV_PIX_FMT_RGB24;
 
     enc->max_b_frames = 1;
@@ -65,12 +72,11 @@ bool Encoder::setup(const VideoEncoderSettings* settings, const ContainerSetting
         * the motion of the chroma plane does not match the luma plane. */
         enc->mb_decision = 2;
     }
-    if( enc->codec_id == AV_CODEC_ID_H264 ){
-        av_opt_set(enc->priv_data, "preset", "fast", 0);
+    
+    for (const auto& [key, value] : settings->getPrivateData()) {
+        av_opt_set(enc->priv_data, key.c_str(), value.c_str(), 0);
     }
-    if( enc->codec_id == AV_CODEC_ID_H265 ){
-        av_opt_set(enc->priv_data, "preset", "fast", 0);
-    }
+
     
 
     int ret = avcodec_open2(enc, NULL, NULL);
