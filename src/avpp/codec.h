@@ -19,11 +19,10 @@ public:
     ~Encoder();
 
     template <typename Settings>
-    bool setup(const Settings& settings);
-    
-    bool setup( const VideoEncoderSettings* settings, const ContainerSettings* containersettings );
-    bool encode( Frame& f);
-    bool encode( const ofPixels &pix );
+    bool setup( const Settings* settings, const ContainerSettings* containersettings );
+    //bool encode( Frame& f);
+    template <typename Data>
+    bool encode( const Data &d );
     
     AVCodecContext* native();
     AVCodecContext* operator -> () {
@@ -35,7 +34,8 @@ protected:
     Frame frame;
 };
 
-template<> bool Encoder::setup(const VideoEncoderSettings& settings);
+template<> bool Encoder::setup(const VideoEncoderSettings* settings, const ContainerSettings* containersettings);
+template<> bool Encoder::encode( const ofPixels &pix );
 
 
 }

@@ -19,36 +19,50 @@ Encoder::~Encoder(){
     enc = nullptr;
 }
 
-
-bool Encoder::setup(const VideoEncoderSettings* settings, const ContainerSettings* containerSettings){
-    ofLogError()<<__FILE__<<"@"<<__LINE__;
-    
+AVCodec* findCodec( AVCodecID id, std::string name ){
+    // Try first to retrieve the codec by its name
     AVCodec *codec = nullptr;
-    if( settings->getCodecName().length()>0 ){
-        codec = avcodec_find_encoder_by_name(settings->getCodecName().c_str());
+    if( name.length()>0 ){
+        codec = avcodec_find_encoder_by_name( name.c_str() );
+        if( codec ){
+            ofLogNotice()<<"Using "<< name << " codec.";
+            return codec;
+        }
     }
-    if( !codec ){
-        codec = avcodec_find_encoder( settings->getCodecId() );
+    // If that fails (or because no name was provided), try to find it by id
+    codec = avcodec_find_encoder( id );
+    if( codec ){
+        ofLogNotice()<<"Using "<< codec->name << " codec from ID:" << codec->id;
+        return codec;
     }
-    //AVCodec *codec = avcodec_find_encoder( settings->getCodecId() );
-    //AVCodec *codec = avcodec_find_encoder_by_name("libx264rgb");
-    ofLogError()<<__FILE__<<"@"<<__LINE__;
+    // Cannot find a codec, return false for an error
+    ofLogError()<<"Could not find a matching codec";
+    return nullptr;
+}
+
+template<>
+bool Encoder::setup(const VideoEncoderSettings* settings, const ContainerSettings* containerSettings){
+    auto codec = findCodec( settings->getCodecId(), settings->getCodecName());
     if( !codec ) return false;
-    ofLogError()<<__FILE__<<"@"<<__LINE__;
+    
+    // Allocate the encoder from the codec
     enc = avcodec_alloc_context3( codec );
     if( !enc ) {
         ofLogError() << "setup_encoder : codec not found"; 
         return false;
     }
-    ofLogError()<<__FILE__<<"@"<<__LINE__;
-    /* Some formats want stream headers to be separate. */
+
+    // Some formats want stream headers to be separate.
     if( containerSettings->hasGlobalHeader ) enc->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
-    ofLogError()<<__FILE__<<"@"<<__LINE__;
-    /* Put sample parameters. */
-    enc->bit_rate = 4000000;
+    
+    // Put sample parameters. 
+    auto bit_rate = settings->getIntProperty("bit_rate");
+    if( bit_rate ) enc->bit_rate = *bit_rate;
     /* Resolution must be a multiple of two. */
     enc->width    = settings->width;
     enc->height   = settings->height;
+    // pixel format ()
+    enc->pix_fmt       = settings->getPixelFormat();
     /* timebase: This is the fundamental unit of time (in seconds) in terms
     * of which frame timestamps are represented. For fixed-fps content,
     * timebase should be 1/framerate and timestamp increments should be
@@ -56,16 +70,18 @@ bool Encoder::setup(const VideoEncoderSettings* settings, const ContainerSetting
     //enc->time_base       = (AVRational){ 1, fps };
     enc->time_base = (AVRational){ 1, 1000000}; // microseconds
 
-    enc->gop_size      = 12; /* emit one intra frame every twelve frames at most */
-    enc->pix_fmt       = settings->getPixelFormat();
-    //enc->pix_fmt       = AV_PIX_FMT_RGB24;
+    // Group of picture
+    auto gop_size = settings->getIntProperty("gop_size");
+    if( gop_size ) enc->gop_size = *gop_size;
 
-    enc->max_b_frames = 1;
-    
-    if( enc->codec_id == AV_CODEC_ID_MPEG2VIDEO ){
-        /* just for testing, we also add B-frames */
-        enc->max_b_frames = 2;
+    // Maximum consecutive B(idirectional) frames (4-5 typical 16 max)
+    auto max_b_frames = settings->getIntProperty("max_b_frames");
+    if( max_b_frames ){
+        enc->max_b_frames = *max_b_frames;
+    }else{
+        enc->max_b_frames = 4;
     }
+    
     if( enc->codec_id == AV_CODEC_ID_MPEG1VIDEO ){
         /* Needed to avoid using macroblocks in which some coeffs overflow.
         * This does not happen with normal video, it just happens here as
@@ -77,74 +93,15 @@ bool Encoder::setup(const VideoEncoderSettings* settings, const ContainerSetting
         av_opt_set(enc->priv_data, key.c_str(), value.c_str(), 0);
     }
 
-    
-
+    // Open the encoder
     int ret = avcodec_open2(enc, NULL, NULL);
+
     frame.setup(enc->pix_fmt, enc->width, enc->height);
     return (ret == 0);
-    //avcodec_find_encoder_by_name
-}
-
-template<> bool Encoder::setup(const VideoEncoderSettings& settings){
-    ofLogError()<<__FILE__<<"@"<<__LINE__;
-    
-    AVCodec *codec = avcodec_find_encoder( settings.getCodecId() );
-    ofLogError()<<__FILE__<<"@"<<__LINE__;
-    //avcodec_find_encoder_by_name
-    if( !codec ) return false;
-    ofLogError()<<__FILE__<<"@"<<__LINE__;
-    enc = avcodec_alloc_context3( codec );
-    if( !enc ) {
-        ofLogError() << "setup_encoder : codec not found"; 
-        return false;
-    }
-    ofLogError()<<__FILE__<<"@"<<__LINE__;
-    /* Some formats want stream headers to be separate. */
-    if( settings.hasGlobalHeader ) enc->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
-    ofLogError()<<__FILE__<<"@"<<__LINE__;
-    /* Put sample parameters. */
-    enc->bit_rate = 4000000;
-    /* Resolution must be a multiple of two. */
-    enc->width    = settings.width;
-    enc->height   = settings.height;
-    /* timebase: This is the fundamental unit of time (in seconds) in terms
-    * of which frame timestamps are represented. For fixed-fps content,
-    * timebase should be 1/framerate and timestamp increments should be
-    * identical to 1. */
-    //enc->time_base       = (AVRational){ 1, fps };
-    enc->time_base = (AVRational){ 1, 1000000}; // microseconds
-
-    enc->gop_size      = 12; /* emit one intra frame every twelve frames at most */
-    enc->pix_fmt       = AV_PIX_FMT_YUV444P;
-    //enc->pix_fmt       = AV_PIX_FMT_RGB24;
-
-    enc->max_b_frames = 1;
-    
-    if( enc->codec_id == AV_CODEC_ID_MPEG2VIDEO ){
-        /* just for testing, we also add B-frames */
-        enc->max_b_frames = 2;
-    }
-    if( enc->codec_id == AV_CODEC_ID_MPEG1VIDEO ){
-        /* Needed to avoid using macroblocks in which some coeffs overflow.
-        * This does not happen with normal video, it just happens here as
-        * the motion of the chroma plane does not match the luma plane. */
-        enc->mb_decision = 2;
-    }
-    if( enc->codec_id == AV_CODEC_ID_H264 ){
-        av_opt_set(enc->priv_data, "preset", "fast", 0);
-    }
-    if( enc->codec_id == AV_CODEC_ID_H265 ){
-        av_opt_set(enc->priv_data, "preset", "fast", 0);
-    }
-    
-
-    int ret = avcodec_open2(enc, NULL, NULL);
-    frame.setup(enc->pix_fmt, enc->width, enc->height);
-    return (ret == 0);
-    //avcodec_find_encoder_by_name
 }
 
 
+template<>
 bool Encoder::encode( const ofPixels &pix ){
     if( !enc ) return false;
     if( !frame.encode(pix) ) return false;
@@ -157,8 +114,5 @@ bool Encoder::encode( const ofPixels &pix ){
 AVCodecContext* Encoder::native(){
     return enc;
 }
-
-/*H265EncoderSettings::H265EncoderSettings(){
-};*/
 
 } // namespace avpp

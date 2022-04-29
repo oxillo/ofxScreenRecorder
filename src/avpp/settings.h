@@ -2,6 +2,7 @@
 
 #include <string>
 #include <map>
+#include <optional>
 extern "C" {
 #include "libavcodec/avcodec.h"
 #include "libavutil/pixfmt.h"
@@ -47,6 +48,22 @@ public:
     virtual AVPixelFormat getPixelFormat() const {
         return _pixelFormat; 
     };
+
+    bool hasProperty( const std::string &prop ) const{
+        return (properties.count( prop ) != 0);
+    }
+    
+    /**
+    *  Return property as an int if it is defined
+    */
+    std::optional<int> getIntProperty( const std::string &prop ) const {
+        if( ! hasProperty(prop) ) return std::nullopt;
+        try {
+            return stoi( properties.at(prop) );
+        } catch(std::invalid_argument &e) {
+            return std::nullopt;
+        }
+    }
     
     const std::map<std::string,std::string> &getPrivateData() const {return private_data;}
 
@@ -54,12 +71,18 @@ protected:
     AVCodecID _codec_id;
     std::string _codec_name;
     AVPixelFormat _pixelFormat;
+    std::map<std::string,std::string> properties;
     std::map<std::string,std::string> private_data;
+
     /**
     ** Create settings with the specified codec If 'name' is specified, it will try to use the specified implementation of the encoder.
     ** This can be useful when there are multiple implementation x264, nvenc, h264
     */
-    VideoEncoderSettings( AVCodecID codec, std::string name=""):_codec_id(codec), _codec_name(name){}
+    VideoEncoderSettings( AVCodecID codec, std::string name=""):_codec_id(codec), _codec_name(name){
+        properties["bit_rate"] = "4000000";
+        properties["gop_size"] = "12";
+        properties["max_b_frames"] = "1";
+    }
 };
 
 
