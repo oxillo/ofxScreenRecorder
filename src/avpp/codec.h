@@ -4,6 +4,7 @@
 #include "./settings.h"
 extern "C" {
 #include "libavutil/opt.h"
+#include "libavformat/avformat.h"
 }
 
 
@@ -31,6 +32,17 @@ public:
         // Default to microsecond timebase.
         return (AVRational){ 1, 1000000};
     }
+
+    bool copyParametersToStream(AVStream* st){
+        if( enc ){
+            st->time_base = enc->time_base;
+            // copy the stream parameters to the muxer
+            avcodec_parameters_from_context(st->codecpar, enc);;
+            return true;
+        }
+        return false;
+        
+    }
     
     AVCodecContext* native();
     AVCodecContext* operator -> () {
@@ -44,6 +56,7 @@ protected:
 };
 
 template<> bool Encoder::setup(const VideoEncoderSettings* settings, const ContainerSettings* containersettings);
+template<> bool Encoder::setup(const AudioEncoderSettings* settings, const ContainerSettings* containersettings);
 template<> bool Encoder::encode( const ofPixels &pix );
 
 

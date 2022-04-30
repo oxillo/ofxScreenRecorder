@@ -167,8 +167,8 @@ void ScreenRecorder::draw( const ofFbo &fbo ){
     compositingFbo.readToPixels( pix );
     
     if( fmt.isRecordingActive() ){
-        fmt[0].encode(pix);
-        fmt[1].encode(pix);
+        fmt.video(0).encode(pix);
+        fmt.video(1).encode(pix);
     }
 }
 

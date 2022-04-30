@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+
 extern "C" {
 #include "libavformat/avformat.h"
 }
@@ -23,12 +25,9 @@ public:
     /** Move constructor
     */
     Stream(Stream && other):enc(std::move(other.enc)){
-        st = other.st;
-        other.st = nullptr;
-        pkt = other.pkt;
-        other.pkt = nullptr;
-        fmtctx = other.fmtctx;
-        other.fmtctx = nullptr;
+        std::swap( st, other.st );
+        std::swap( pkt, other.pkt );
+        std::swap( fmtctx, other.fmtctx );
     }
     
     ~Stream() {}
@@ -40,24 +39,17 @@ public:
 
     bool setupEncoder( const SettingType* settings, const ContainerSettings *contSettings ){
         enc.setup( settings, contSettings );
-        st->time_base = enc->time_base;
-        /* copy the stream parameters to the muxer */
-        avcodec_parameters_from_context(st->codecpar, enc.native());
-        return true;
+        return enc.copyParametersToStream(st);
     }
-    /*template <typename T>
-    bool encode( const T &d );*/
-    bool encode( const ofPixels &pix){
-        if (!enc.encode(pix)) {
-            ofLogError()<<__FILE__<<"@"<<__LINE__;
+
+    template <typename T>
+    bool encode( const T &data ){
+        if (!enc.encode(data)) {
             return false;
         }
         return writePacketsToFormat();
     }
-    
 
-    
-    //friend bool Container::startRecording();
     friend class Container;
     bool fromEncoder( const Encoder &encoder );
 
@@ -98,8 +90,6 @@ private:
 
 typedef Stream<VideoEncoderSettings> VideoStream;
 typedef Stream<AudioEncoderSettings> AudioStream;
-
-
 
 }
 

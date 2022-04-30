@@ -100,6 +100,11 @@ bool Encoder::setup(const VideoEncoderSettings* settings, const ContainerSetting
     return (ret == 0);
 }
 
+template<> 
+bool Encoder::setup(const AudioEncoderSettings* settings, const ContainerSettings* containersettings){
+    return true;
+}
+
 bool Encoder::getPacket(AVPacket* pkt){
     auto ret = avcodec_receive_packet(enc, pkt);
     if( ret>=0 ) return true;

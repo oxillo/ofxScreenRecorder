@@ -44,21 +44,33 @@ void Container::addVideoStream(const VideoEncoderSettings& settings){
 }*/
 
 
-VideoStream& Container::operator[](std::size_t idx){
-    return streams[idx];
+VideoStream& Container::video(std::size_t idx){
+    return videoStreams[idx];
 }
 
-const VideoStream& Container::operator[](std::size_t idx) const{
-    ofLogError()<<__FILE__<<"@"<<__LINE__;
-    return streams[idx];
+const VideoStream& Container::video(std::size_t idx) const{
+    return videoStreams[idx];
+}
+
+AudioStream& Container::audio(std::size_t idx){
+    return audioStreams[idx];
+}
+
+const AudioStream& Container::audio(std::size_t idx) const{
+    return audioStreams[idx];
 }
 
 bool Container::startRecording(){
     containerSettings.hasGlobalHeader = oc->oformat->flags & AVFMT_GLOBALHEADER;
     // Add video streams
     for (auto streamSettings: videoStreamsSettings) {
-        streams.emplace_back( VideoStream{oc, &streamSettings, &containerSettings} );
+        videoStreams.emplace_back( VideoStream{oc, &streamSettings, &containerSettings} );
     }
+    // Add audio streams
+    for (auto streamSettings: audioStreamsSettings) {
+        audioStreams.emplace_back( AudioStream{oc, &streamSettings, &containerSettings} );
+    }
+    // Add subtitle streams
     av_dump_format(oc, 0, filename.c_str(), 1);
     if( isFileFormat()  
         && avio_open(&oc->pb, filename.c_str(), AVIO_FLAG_WRITE) >= 0 ){
@@ -77,7 +89,8 @@ bool Container::stopRecording(){
             avio_close(oc->pb);
         }
     }
-    streams.clear();
+    videoStreams.clear();
+    audioStreams.clear();
     if(oc) {
         avformat_free_context(oc);
         oc = nullptr;
