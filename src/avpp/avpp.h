@@ -45,8 +45,8 @@ public:
     void addVideoStream(const VideoEncoderSettings& settings);
     void addAudioStream(const AudioEncoderSettings& settings);
     
-    Stream& operator[](std::size_t idx);
-    const Stream& operator[](std::size_t idx) const;
+    VideoStream& operator[](std::size_t idx);
+    const VideoStream& operator[](std::size_t idx) const;
 
     bool startRecording();
     bool stopRecording();
@@ -57,7 +57,7 @@ private:
     std::vector<VideoEncoderSettings> videoStreamsSettings;
     ContainerSettings containerSettings;
     bool isRecording;
-    std::vector<Stream> streams;
+    std::vector<VideoStream> streams;
     AVFormatContext *oc;
     std::string filename;
 };

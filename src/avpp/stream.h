@@ -13,24 +13,47 @@ namespace avpp{
 
 class Container;
 
+
+template<typename SettingType>
 class Stream {
 public:
-    Stream();
+    Stream():st(nullptr),pkt(nullptr), fmtctx(nullptr){}
     Stream(const Stream &other) = delete; // No copy
 
     /** Move constructor
     */
-    Stream(Stream && other);
+    Stream(Stream && other):enc(std::move(other.enc)){
+        st = other.st;
+        other.st = nullptr;
+        pkt = other.pkt;
+        other.pkt = nullptr;
+        fmtctx = other.fmtctx;
+        other.fmtctx = nullptr;
+    }
     
-    ~Stream();
+    ~Stream() {}
     
-    int index();
+    int index() {
+        if( st ) return st->index;
+        return -1;
+    }
 
-    template <typename T>
-    bool setupEncoder( const T* settings, const ContainerSettings *contSettings );
+    bool setupEncoder( const SettingType* settings, const ContainerSettings *contSettings ){
+        enc.setup( settings, contSettings );
+        st->time_base = enc->time_base;
+        /* copy the stream parameters to the muxer */
+        avcodec_parameters_from_context(st->codecpar, enc.native());
+        return true;
+    }
     /*template <typename T>
     bool encode( const T &d );*/
-    bool encode( const ofPixels &pix);
+    bool encode( const ofPixels &pix){
+        if (!enc.encode(pix)) {
+            ofLogError()<<__FILE__<<"@"<<__LINE__;
+            return false;
+        }
+        return writePacketsToFormat();
+    }
     
 
     
@@ -39,8 +62,12 @@ public:
     bool fromEncoder( const Encoder &encoder );
 
 protected:
-    template <typename T>
-    Stream( AVFormatContext *fmtctx, const T* settings, const ContainerSettings *contSettings );
+    Stream( AVFormatContext *oc, const SettingType* settings, const ContainerSettings *contSettings ){
+        fmtctx = oc;
+        st = avformat_new_stream(fmtctx, NULL);
+        setupEncoder( settings, contSettings );
+        pkt = av_packet_alloc();
+    }
 
 private:
     AVStream *st;
@@ -48,16 +75,31 @@ private:
     AVFormatContext *fmtctx;
     Encoder enc;
 
-    bool writePacketsToFormat();
+    bool writePacketsToFormat(){
+        while (enc.getPacket( pkt )) {
+            writePacket();
+        }
+        return true;
+    }
 
-    bool writePacket();
+    bool writePacket(){
+        // rescale packet timestamp to stream timestamp
+        av_packet_rescale_ts(pkt, enc->time_base, st->time_base);
+        // set stream index
+        pkt->stream_index = st->index;
+        // Write packet to the output format (file or network)
+        int ret = av_interleaved_write_frame(fmtctx, pkt);
+        if( ret>= 0 ) return true; // Success
+        return false; //Error
+    }
 };
 
 
-template<>
-Stream::Stream( AVFormatContext *oc, const VideoEncoderSettings* settings, const ContainerSettings *containerSettings );
 
-template<>
-bool Stream::setupEncoder( const VideoEncoderSettings* settings, const ContainerSettings *contSettings );
+typedef Stream<VideoEncoderSettings> VideoStream;
+typedef Stream<AudioEncoderSettings> AudioStream;
+
+
 
 }
+

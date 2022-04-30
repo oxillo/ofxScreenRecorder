@@ -10,7 +10,7 @@ extern "C" {
 namespace avpp{
 
 
-class Stream;
+//class Stream;
 
 class Encoder {
 public:
@@ -25,13 +25,19 @@ public:
     template <typename Data>
     bool encode( const Data &d );
     bool getPacket(AVPacket* pkt);
+
+    AVRational getTimeBase(){
+        if( enc ) return enc->time_base;
+        // Default to microsecond timebase.
+        return (AVRational){ 1, 1000000};
+    }
     
     AVCodecContext* native();
     AVCodecContext* operator -> () {
         return enc;
     }
 
-    friend class Stream;
+    //friend class Stream;
 protected:
     AVCodecContext *enc;
     Frame frame;
