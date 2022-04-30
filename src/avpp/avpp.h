@@ -21,17 +21,10 @@ extern "C"
 #include "ofLog.h"
 #include "graphics/ofPixels.h"
 #include "./codec.h"
-
+#include "./stream.h"
 
 
 namespace avpp{
-
-
-
-
-
-class Stream;
-class VideoStream;
 
 class Container {
 public:
@@ -67,42 +60,6 @@ private:
     std::vector<VideoStream> streams;
     AVFormatContext *oc;
     std::string filename;
-};
-
-class Stream {
-public:
-    Stream();
-    Stream(const Stream &other) = delete; // No copy
-    Stream(Stream &&); // Default move constructor
-    ~Stream();
-    
-    int index();
-
-    //bool setupEncoder( const EncoderSettings& settings );
-    bool encode( const ofPixels &pix);
-    
-    friend bool Container::startRecording();
-
-protected:
-    Stream( AVFormatContext *fmtctx, const EncoderSettings& settings );
-//private:
-    AVStream *st;
-    AVPacket* pkt;
-    AVFormatContext *fmtctx;
-    Encoder enc;
-};
-
-class VideoStream : protected Stream{
-public:
-    VideoStream();
-    bool setupEncoder( const VideoEncoderSettings& settings );
-    bool setupEncoder( const VideoEncoderSettings* settings, const ContainerSettings *contSettings );
-    bool encode( const ofPixels &pix);
-
-    friend bool Container::startRecording();
-protected:
-    VideoStream( AVFormatContext *fmtctx, const VideoEncoderSettings& settings, ContainerSettings *contSettings );
-    VideoStream( AVFormatContext *fmtctx, const VideoEncoderSettings* settings, const ContainerSettings *contSettings );
 };
 
 }

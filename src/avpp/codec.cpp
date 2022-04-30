@@ -100,6 +100,15 @@ bool Encoder::setup(const VideoEncoderSettings* settings, const ContainerSetting
     return (ret == 0);
 }
 
+bool Encoder::getPacket(AVPacket* pkt){
+    auto ret = avcodec_receive_packet(enc, pkt);
+    if( ret>=0 ) return true;
+    if( ret==AVERROR(EAGAIN) ) return false;
+    if( ret==AVERROR_EOF ) return false;
+    ofLogError()<<"Error encoding frame";
+    return false;
+}
+
 
 template<>
 bool Encoder::encode( const ofPixels &pix ){

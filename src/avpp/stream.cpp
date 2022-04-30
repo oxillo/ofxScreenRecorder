@@ -1,14 +1,11 @@
-#include "avpp.h"
+#include "stream.h"
 
 namespace avpp{
 Stream::Stream():st(nullptr),pkt(nullptr), fmtctx(nullptr){
-    ofLogError()<<__FILE__<<"@"<<__LINE__;
 }
 
 VideoStream::VideoStream():Stream(){
-    ofLogError()<<__FILE__<<"@"<<__LINE__;
 }
-
 
 Stream::Stream(Stream && other):enc(std::move(other.enc)){
     st = other.st;
@@ -18,15 +15,6 @@ Stream::Stream(Stream && other):enc(std::move(other.enc)){
     fmtctx = other.fmtctx;
     other.fmtctx = nullptr;
 }
-
-/*Stream::Stream( AVFormatContext *oc, const EncoderSettings& settings ){
-    fmtctx = oc;
-    st = avformat_new_stream(fmtctx, NULL);
-    auto encoderSettings = settings;
-    encoderSettings.hasGlobalHeader = fmtctx->oformat->flags & AVFMT_GLOBALHEADER;
-    setupEncoder(encoderSettings);
-    pkt = av_packet_alloc();
-}*/
 
 VideoStream::VideoStream( AVFormatContext *oc, const VideoEncoderSettings& settings, ContainerSettings *contSettings ){
     fmtctx = oc;
@@ -73,6 +61,7 @@ bool VideoStream::setupEncoder( const VideoEncoderSettings& settings ){
     return true;
 }
 
+
 bool VideoStream::setupEncoder( const VideoEncoderSettings* settings, const ContainerSettings *contSettings ){
     enc.setup( settings, contSettings );
     st->time_base = enc->time_base;
@@ -82,30 +71,30 @@ bool VideoStream::setupEncoder( const VideoEncoderSettings* settings, const Cont
 }
 
 
+bool Stream::writePacketsToFormat(){
+    while (enc.getPacket( pkt )) {
+        writePacket();
+    }
+    return true;
+}
+
+bool Stream::writePacket(){
+    // rescale packet timestamp to stream timestamp
+    av_packet_rescale_ts(pkt, enc->time_base, st->time_base);
+    // set stream index
+    pkt->stream_index = st->index;
+    // Write packet to the output format (file or network)
+    int ret = av_interleaved_write_frame(fmtctx, pkt);
+    if( ret>= 0 ) return true; // Success
+    return false; //Error
+}
+
 bool Stream::encode( const ofPixels &pix){
     if (!enc.encode(pix)) {
         ofLogError()<<__FILE__<<"@"<<__LINE__;
         return false;
     }
-    int ret = 0;
-    while (ret >= 0) {
-        ret = avcodec_receive_packet(enc.native(), pkt);
-        ofLogVerbose()<<__FILE__<<"@"<<__LINE__<<" - " << __PRETTY_FUNCTION__ ;
-        if (ret < 0 && ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
-            fprintf(stderr, "Error encoding a video frame\n");
-        } else if (ret >= 0) {
-            av_packet_rescale_ts(pkt, enc->time_base, st->time_base);
-            pkt->stream_index = st->index;
-            /* Write the compressed frame to the media file. */
-            ret = av_interleaved_write_frame(fmtctx, pkt);
-            if (ret < 0) {
-                fprintf(stderr, "Error while writing video frame\n");
-            }
-        }
-    }
-    return true;
-    /*if( !enc ) return false;
-    return (avcodec_send_frame(enc, f.native()) == 0);*/
+    return writePacketsToFormat();
 }
 
 bool VideoStream::encode( const ofPixels &pix){
@@ -113,25 +102,7 @@ bool VideoStream::encode( const ofPixels &pix){
         ofLogError()<<__FILE__<<"@"<<__LINE__;
         return false;
     }
-    int ret = 0;
-    while (ret >= 0) {
-        ret = avcodec_receive_packet(enc.native(), pkt);
-        ofLogVerbose()<<__FILE__<<"@"<<__LINE__<<" - " << __PRETTY_FUNCTION__ ;
-        if (ret < 0 && ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
-            fprintf(stderr, "Error encoding a video frame\n");
-        } else if (ret >= 0) {
-            av_packet_rescale_ts(pkt, enc->time_base, st->time_base);
-            pkt->stream_index = st->index;
-            /* Write the compressed frame to the media file. */
-            ret = av_interleaved_write_frame(fmtctx, pkt);
-            if (ret < 0) {
-                fprintf(stderr, "Error while writing video frame\n");
-            }
-        }
-    }
-    return true;
-    /*if( !enc ) return false;
-    return (avcodec_send_frame(enc, f.native()) == 0);*/
+    return writePacketsToFormat();
 }
 
 
