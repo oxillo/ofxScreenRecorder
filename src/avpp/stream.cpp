@@ -4,9 +4,6 @@ namespace avpp{
 Stream::Stream():st(nullptr),pkt(nullptr), fmtctx(nullptr){
 }
 
-VideoStream::VideoStream():Stream(){
-}
-
 Stream::Stream(Stream && other):enc(std::move(other.enc)){
     st = other.st;
     other.st = nullptr;
@@ -16,16 +13,8 @@ Stream::Stream(Stream && other):enc(std::move(other.enc)){
     other.fmtctx = nullptr;
 }
 
-VideoStream::VideoStream( AVFormatContext *oc, const VideoEncoderSettings& settings, ContainerSettings *contSettings ){
-    fmtctx = oc;
-    st = avformat_new_stream(fmtctx, NULL);
-    auto encoderSettings = settings;
-    encoderSettings.hasGlobalHeader = fmtctx->oformat->flags & AVFMT_GLOBALHEADER;
-    setupEncoder(&encoderSettings, contSettings );
-    pkt = av_packet_alloc();
-}
-
-VideoStream::VideoStream( AVFormatContext *oc, const VideoEncoderSettings* settings, const ContainerSettings *containerSettings ){
+template<>
+Stream::Stream( AVFormatContext *oc, const VideoEncoderSettings* settings, const ContainerSettings *containerSettings ){
     fmtctx = oc;
     st = avformat_new_stream(fmtctx, NULL);
     setupEncoder( settings, containerSettings );
@@ -42,27 +31,8 @@ int Stream::index(){
 }
 
 
-/*bool Stream::setupEncoder( const EncoderSettings& settings ){
-    enc.setup( settings );
-    st->time_base = enc->time_base;ContainerSettings contSettings;
-    // copy the stream parameters to the muxer 
-    avcodec_parameters_from_context(st->codecpar, enc.native());
-    return true;
-}*/
-
-bool VideoStream::setupEncoder( const VideoEncoderSettings& settings ){
-    ContainerSettings *contSettings = new ContainerSettings();
-    contSettings->hasGlobalHeader = fmtctx->oformat->flags & AVFMT_GLOBALHEADER;
-    
-    enc.setup( &settings, contSettings );
-    st->time_base = enc->time_base;
-    /* copy the stream parameters to the muxer */
-    avcodec_parameters_from_context(st->codecpar, enc.native());
-    return true;
-}
-
-
-bool VideoStream::setupEncoder( const VideoEncoderSettings* settings, const ContainerSettings *contSettings ){
+template<>
+bool Stream::setupEncoder( const VideoEncoderSettings* settings, const ContainerSettings *contSettings ){
     enc.setup( settings, contSettings );
     st->time_base = enc->time_base;
     /* copy the stream parameters to the muxer */
@@ -96,16 +66,5 @@ bool Stream::encode( const ofPixels &pix){
     }
     return writePacketsToFormat();
 }
-
-bool VideoStream::encode( const ofPixels &pix){
-    if (!enc.encode(pix)) {
-        ofLogError()<<__FILE__<<"@"<<__LINE__;
-        return false;
-    }
-    return writePacketsToFormat();
-}
-
-
-
 
 } // namespace avpp
