@@ -17,7 +17,11 @@ class Stream {
 public:
     Stream();
     Stream(const Stream &other) = delete; // No copy
-    Stream(Stream &&); // Default move constructor
+
+    /** Move constructor
+    */
+    Stream(Stream && other);
+    
     ~Stream();
     
     int index();
@@ -27,8 +31,7 @@ public:
     /*template <typename T>
     bool encode( const T &d );*/
     bool encode( const ofPixels &pix);
-    bool writePacketsToFormat();
-    bool writePacket();
+    
 
     
     //friend bool Container::startRecording();
@@ -38,12 +41,18 @@ public:
 protected:
     template <typename T>
     Stream( AVFormatContext *fmtctx, const T* settings, const ContainerSettings *contSettings );
-//private:
+
+private:
     AVStream *st;
     AVPacket* pkt;
     AVFormatContext *fmtctx;
     Encoder enc;
+
+    bool writePacketsToFormat();
+
+    bool writePacket();
 };
+
 
 template<>
 Stream::Stream( AVFormatContext *oc, const VideoEncoderSettings* settings, const ContainerSettings *containerSettings );
