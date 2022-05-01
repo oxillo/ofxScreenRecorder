@@ -127,8 +127,12 @@ public:
 
 class ContainerSettings {
 public:
+    void addVideoStream(const VideoEncoderSettings& settings);
+    void addAudioStream(const AudioEncoderSettings& settings);
+
     bool hasGlobalHeader;
-    std::vector<VideoEncoderSettings> videoStreams;
+    std::vector<VideoEncoderSettings> videoStreamsSettings;
+    std::vector<AudioEncoderSettings> audioStreamsSettings;
 };
 
 

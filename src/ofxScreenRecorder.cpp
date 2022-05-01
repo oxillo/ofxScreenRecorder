@@ -98,12 +98,12 @@ void ScreenRecorder::open_video(std::string filename){
     settings.height = compositingFbo.getHeight();
     settings.fps = 30;
 
-    fmt.addVideoStream( settings );
+    fmt.settings().addVideoStream( settings );
     avpp::H265EncoderSettings  settings2;
     settings2.width = compositingFbo.getWidth();
     settings2.height = compositingFbo.getHeight();
     settings2.fps = 30;
-    fmt.addVideoStream( settings2 );
+    fmt.settings().addVideoStream( settings2 );
     
     if( !fmt.startRecording() ){
         ofLogError() << "Recording can not be started";

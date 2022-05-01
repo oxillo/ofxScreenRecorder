@@ -41,10 +41,6 @@ public:
     bool isFileFormat();
     bool hasGlobalHeader();
 
-    //void addStream(const EncoderSettings& settings);
-    void addVideoStream(const VideoEncoderSettings& settings);
-    void addAudioStream(const AudioEncoderSettings& settings);
-    
     VideoStream& video(std::size_t idx);
     const VideoStream& video(std::size_t idx) const;
     AudioStream& audio(std::size_t idx);
@@ -53,11 +49,11 @@ public:
     bool startRecording();
     bool stopRecording();
     bool isRecordingActive() { return isRecording;}
+    ContainerSettings& settings() {return containerSettings;}
+    const ContainerSettings& settings() const {return containerSettings;}
 
     
 private:
-    std::vector<VideoEncoderSettings> videoStreamsSettings;
-    std::vector<AudioEncoderSettings> audioStreamsSettings;
     ContainerSettings containerSettings;
     bool isRecording;
     std::vector<VideoStream> videoStreams;

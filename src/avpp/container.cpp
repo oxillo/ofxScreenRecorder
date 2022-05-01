@@ -34,16 +34,6 @@ bool Container::hasGlobalHeader(){
 }
 
 
-
-void Container::addVideoStream(const VideoEncoderSettings& settings){
-    videoStreamsSettings.push_back( settings );
-}
-
-/*void Container::addStream(const EncoderSettings& settings){
-    streams.emplace_back( Stream{oc,settings} );
-}*/
-
-
 VideoStream& Container::video(std::size_t idx){
     return videoStreams[idx];
 }
@@ -63,11 +53,11 @@ const AudioStream& Container::audio(std::size_t idx) const{
 bool Container::startRecording(){
     containerSettings.hasGlobalHeader = oc->oformat->flags & AVFMT_GLOBALHEADER;
     // Add video streams
-    for (auto streamSettings: videoStreamsSettings) {
+    for (auto streamSettings: settings().videoStreamsSettings) {
         videoStreams.emplace_back( VideoStream{oc, &streamSettings, &containerSettings} );
     }
     // Add audio streams
-    for (auto streamSettings: audioStreamsSettings) {
+    for (auto streamSettings: settings().audioStreamsSettings) {
         audioStreams.emplace_back( AudioStream{oc, &streamSettings, &containerSettings} );
     }
     // Add subtitle streams
@@ -103,5 +93,13 @@ bool Container::stopRecording(){
     return oc;
 }*/
 
+
+void ContainerSettings::addVideoStream(const VideoEncoderSettings& settings){
+    videoStreamsSettings.push_back( settings );
+}
+
+void ContainerSettings::addAudioStream(const AudioEncoderSettings& settings){
+    audioStreamsSettings.push_back( settings );
+}
 
 } // namespace avpp

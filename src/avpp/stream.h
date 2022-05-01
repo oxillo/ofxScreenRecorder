@@ -76,7 +76,7 @@ private:
 
     bool writePacket(){
         // rescale packet timestamp to stream timestamp
-        av_packet_rescale_ts(pkt, enc->time_base, st->time_base);
+        av_packet_rescale_ts(pkt, enc.getTimeBase(), st->time_base);
         // set stream index
         pkt->stream_index = st->index;
         // Write packet to the output format (file or network)
