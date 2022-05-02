@@ -53,8 +53,9 @@ const AudioStream& Container::audio(std::size_t idx) const{
 bool Container::startRecording(){
     containerSettings.hasGlobalHeader = oc->oformat->flags & AVFMT_GLOBALHEADER;
     // Add video streams
-    for (auto streamSettings: settings().videoStreamsSettings) {
-        videoStreams.emplace_back( VideoStream{oc, &streamSettings, &containerSettings} );
+    for (auto streamSettings: settings().videoStreamsSettings2) {
+        ofLogError(__FILE__)<<__LINE__ <<" width:"<<streamSettings->width;;
+        videoStreams.emplace_back( VideoStream{oc, streamSettings.get(), &containerSettings} );
     }
     // Add audio streams
     for (auto streamSettings: settings().audioStreamsSettings) {

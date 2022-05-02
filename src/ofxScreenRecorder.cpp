@@ -92,18 +92,25 @@ void ScreenRecorder::open_video(std::string filename){
     
     /* Setup the encoder */
     //auto  settings = avpp::VideoEncoderSettings::H264();
-    avpp::H264RGBEncoderSettings  settings;
+    /*avpp::H264RGBEncoderSettings  settings;
     //settings.codec_id = AV_CODEC_ID_H264;
+    settings.width = compositingFbo.getWidth();
+    settings.height = compositingFbo.getHeight();
+    settings.fps = 30;*/
+
+    /*std::shared_ptr<avpp::H264RGBEncoderSettings> settings_ = fmt.settings().addVideoStream<avpp::H264RGBEncoderSettings>();
+    avpp::H264RGBEncoderSettings &settings = *settings_;*/
+    auto& settings = fmt.settings().addVideoStream<avpp::H264RGBEncoderSettings>();
     settings.width = compositingFbo.getWidth();
     settings.height = compositingFbo.getHeight();
     settings.fps = 30;
 
-    fmt.settings().addVideoStream( settings );
-    avpp::H265EncoderSettings  settings2;
+    auto& settings2 = fmt.settings().addVideoStream<avpp::H265EncoderSettings>();
+    //avpp::H265EncoderSettings  settings2;
     settings2.width = compositingFbo.getWidth();
     settings2.height = compositingFbo.getHeight();
     settings2.fps = 30;
-    fmt.settings().addVideoStream( settings2 );
+    //fmt.settings().addVideoStream( settings2 );*/
     
     if( !fmt.startRecording() ){
         ofLogError() << "Recording can not be started";
@@ -137,6 +144,7 @@ void ScreenRecorder::startRecordingMovie( std::string filename ){
         filename = autoFilename.str();
     }
     open_video(filename);
+    ofLogError(__FILE__)<<__LINE__;
     movieStartTimeMicros = ofGetSystemTimeMicros();
 }
 

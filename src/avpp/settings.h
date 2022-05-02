@@ -128,10 +128,23 @@ public:
 class ContainerSettings {
 public:
     void addVideoStream(const VideoEncoderSettings& settings);
+    template<typename T>
+    std::shared_ptr<T> addVideoStream2(){
+        videoStreamsSettings2.emplace_back( std::make_shared<T>() );
+        auto settings = videoStreamsSettings2.back();
+        return std::static_pointer_cast<T>(settings);
+    }
+    template<typename T>
+    auto& addVideoStream(){
+        videoStreamsSettings2.emplace_back( std::make_shared<T>() );
+        auto settings = std::static_pointer_cast<T>( videoStreamsSettings2.back() );
+        return *settings;
+    }
     void addAudioStream(const AudioEncoderSettings& settings);
 
     bool hasGlobalHeader;
     std::vector<VideoEncoderSettings> videoStreamsSettings;
+    std::vector<std::shared_ptr<VideoEncoderSettings>> videoStreamsSettings2;
     std::vector<AudioEncoderSettings> audioStreamsSettings;
 };
 
