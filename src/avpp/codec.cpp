@@ -100,8 +100,19 @@ bool Encoder::setup(const VideoEncoderSettings* settings, const ContainerSetting
     return (ret == 0);
 }
 
+/**
+ * \todo setup of audio encoder
+ */
 template<> 
 bool Encoder::setup(const AudioEncoderSettings* settings, const ContainerSettings* containersettings){
+    return true;
+}
+
+/**
+ * \todo setup of subtitle encoder
+ */
+template<> 
+bool Encoder::setup(const SubtitleEncoderSettings* settings, const ContainerSettings* containersettings){
     return true;
 }
 

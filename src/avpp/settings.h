@@ -169,6 +169,20 @@ protected:
 };
 
 /**
+* Settings for subtitle encoder
+*/
+class SubtitleEncoderSettings : public EncoderSettings{
+protected:
+    
+    /**
+    ** Create settings with the specified codec If 'name' is specified, it will try to use the specified implementation of the encoder.
+    ** This can be useful when there are multiple implementation x264, nvenc, h264
+    */
+    SubtitleEncoderSettings( AVCodecID codec, std::string name=""): EncoderSettings(codec,name) {
+    }
+};
+
+/**
 * Settings for the creation of a container. It describes the stream that will be used.
 */
 class ContainerSettings {
@@ -193,11 +207,21 @@ public:
         return *settings;
     }
 
+    /**
+     *  Add a subtitle stream using SubtitleEncoderSettings
+     */
+    template<typename T>
+    auto& addSubtitleStream(){
+        subtitleStreamsSettings.emplace_back( std::make_shared<T>( ) );
+        auto settings = std::static_pointer_cast<T>( subtitleStreamsSettings.back() );
+        return *settings;
+    }
 
 
     bool hasGlobalHeader;
     std::vector<std::shared_ptr<VideoEncoderSettings>> videoStreamsSettings;
     std::vector<std::shared_ptr<AudioEncoderSettings>> audioStreamsSettings;
+    std::vector<std::shared_ptr<SubtitleEncoderSettings>> subtitleStreamsSettings;
     
 };
 

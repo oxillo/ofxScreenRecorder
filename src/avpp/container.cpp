@@ -62,7 +62,12 @@ bool Container::startRecording(){
         audioStreams.emplace_back( AudioStream{oc, streamSettings.get(), &containerSettings} );
     }
     // Add subtitle streams
+    for (auto streamSettings: settings().subtitleStreamsSettings) {
+        subtitleStreams.emplace_back( SubtitleStream{oc, streamSettings.get(), &containerSettings} );
+    }
+
     av_dump_format(oc, 0, filename.c_str(), 1);
+
     if( isFileFormat()  
         && avio_open(&oc->pb, filename.c_str(), AVIO_FLAG_WRITE) >= 0 ){
         /* Write the stream header, if any. */

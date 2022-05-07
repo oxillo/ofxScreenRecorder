@@ -90,6 +90,7 @@ private:
 
 typedef Stream<VideoEncoderSettings> VideoStream;
 typedef Stream<AudioEncoderSettings> AudioStream;
+typedef Stream<SubtitleEncoderSettings> SubtitleStream;
 
 }
 

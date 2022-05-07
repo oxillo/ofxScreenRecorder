@@ -79,6 +79,7 @@ protected:
 
 template<> bool Encoder::setup(const VideoEncoderSettings* settings, const ContainerSettings* containersettings);
 template<> bool Encoder::setup(const AudioEncoderSettings* settings, const ContainerSettings* containersettings);
+template<> bool Encoder::setup(const SubtitleEncoderSettings* settings, const ContainerSettings* containersettings);
 
 template<> bool Encoder::encode( const ofPixels &pix );
 

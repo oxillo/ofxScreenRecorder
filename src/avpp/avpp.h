@@ -45,6 +45,8 @@ public:
     const VideoStream& video(std::size_t idx) const;
     AudioStream& audio(std::size_t idx);
     const AudioStream& audio(std::size_t idx) const;
+    SubtitleStream& subtitle(std::size_t idx);
+    const SubtitleStream& subtitle(std::size_t idx) const;
 
     bool startRecording();
     bool stopRecording();
@@ -58,6 +60,7 @@ private:
     bool isRecording;
     std::vector<VideoStream> videoStreams;
     std::vector<AudioStream> audioStreams;
+    std::vector<SubtitleStream> subtitleStreams;
     AVFormatContext *oc;
     std::string filename;
 };
