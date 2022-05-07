@@ -17,9 +17,7 @@ const ofColor recorderForegroundColor = ofColor::white;
 //===============================================================================
 /* ScreenRecorder constructor */
 ScreenRecorder::ScreenRecorder(){
-    /* Initialize libavcodec, and register all codecs and formats. */
-    //av_register_all();
-
+    
     titleFont.load("arial.ttf",32);
     //titleFont.setLineHeight(28.0f);
     titleFont.setLetterSpacing(1.037);
@@ -68,20 +66,6 @@ void ScreenRecorder::addLogo(ofImage newLogo){
 }
 
 
-//===============================================================================
-/* Add a video output stream. */
-/*bool ScreenRecorder::add_video_stream(){
-    
-    st.st = avformat_new_stream(oc, NULL);
-    if (!st.st) {
-        ofLogError(OFX_ADDON) << "add_video_stream : could not allocate stream";
-        return false;
-    }
-
-    st.st->time_base = enc->time_base;
-    
-    return true;
-}*/
 
 //===============================================================================
 
@@ -90,27 +74,12 @@ void ScreenRecorder::open_video(std::string filename){
 
     if( !fmt.fromFilename(filename) ) fmt.fromShortName("mp4");
     
-    /* Setup the encoder */
-    //auto  settings = avpp::VideoEncoderSettings::H264();
-    /*avpp::H264RGBEncoderSettings  settings;
-    //settings.codec_id = AV_CODEC_ID_H264;
-    settings.width = compositingFbo.getWidth();
-    settings.height = compositingFbo.getHeight();
-    settings.fps = 30;*/
-
-    /*std::shared_ptr<avpp::H264RGBEncoderSettings> settings_ = fmt.settings().addVideoStream<avpp::H264RGBEncoderSettings>();
-    avpp::H264RGBEncoderSettings &settings = *settings_;*/
-    auto& settings = fmt.settings().addVideoStream<avpp::H264RGBEncoderSettings>();
-    settings.width = compositingFbo.getWidth();
-    settings.height = compositingFbo.getHeight();
-    settings.fps = 30;
-
-    auto& settings2 = fmt.settings().addVideoStream<avpp::H265EncoderSettings>();
-    //avpp::H265EncoderSettings  settings2;
-    settings2.width = compositingFbo.getWidth();
-    settings2.height = compositingFbo.getHeight();
-    settings2.fps = 30;
-    //fmt.settings().addVideoStream( settings2 );*/
+    // Setup the streams in the container
+    auto& settings = fmt.settings().addVideoStream<avpp::H264RGBEncoderSettings>(
+        compositingFbo.getWidth(), compositingFbo.getHeight(), 30.0);
+    
+   auto& settings2 = fmt.settings().addVideoStream<avpp::H265EncoderSettings>(
+       compositingFbo.getWidth(), compositingFbo.getHeight(), 30.0);
     
     if( !fmt.startRecording() ){
         ofLogError() << "Recording can not be started";
