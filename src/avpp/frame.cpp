@@ -3,9 +3,7 @@
 
 namespace avpp{
     
-Frame::Frame(){
-    frame = nullptr;
-    sws_context = nullptr;
+Frame::Frame(): frame(nullptr),sws_context(nullptr){
 }
 
 Frame::Frame(enum AVPixelFormat pix_fmt, int width, int height) {

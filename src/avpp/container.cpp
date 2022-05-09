@@ -2,7 +2,7 @@
 
 namespace avpp{
     
-Container::Container() {
+Container::Container():oc(nullptr) {
     isRecording = false;
 }
 Container::~Container(){
