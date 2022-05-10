@@ -2,7 +2,14 @@
 
 #include <string>
 #include <map>
+#if __cplusplus >= 201703L
 #include <optional>
+#else
+#include <experimental/optional>
+namespace std {
+        namespace optional = experimental::optional;
+}
+#endif
 extern "C" {
 #include "libavcodec/avcodec.h"
 #include "libavutil/pixfmt.h"

@@ -5,6 +5,7 @@ namespace avpp{
 Container::Container():oc(nullptr) {
     isRecording = false;
 }
+
 Container::~Container(){
     stopRecording();
 }
